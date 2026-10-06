@@ -1,0 +1,124 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 195 100% 95%;
+    --foreground: 220 40% 20%;
+
+    --card: 180 40% 97%;
+    --card-foreground: 220 40% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 40% 20%;
+
+    --primary: 170 60% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 340 70% 65%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 195 30% 90%;
+    --muted-foreground: 220 25% 35%;
+
+    --accent: 45 100% 65%;
+    --accent-foreground: 220 40% 20%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 195 30% 85%;
+    --input: 195 30% 85%;
+    --ring: 170 60% 45%;
+
+    --radius: 1rem;
+
+    --font-display: 'Fredoka', sans-serif;
+    --font-body: 'Nunito', sans-serif;
+
+    --gradient-sky: linear-gradient(180deg, hsl(195 100% 90%) 0%, hsl(195 100% 95%) 100%);
+    --gradient-progress: linear-gradient(90deg, hsl(170 60% 45%) 0%, hsl(170 80% 55%) 50%, hsl(45 100% 65%) 100%);
+    --gradient-celebration: linear-gradient(180deg, hsl(45 100% 85%) 0%, hsl(340 70% 90%) 50%, hsl(195 100% 90%) 100%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer components {
+  .gradient-sky {
+    background: var(--gradient-sky);
+  }
+
+  .gradient-progress {
+    background: var(--gradient-progress);
+  }
+
+  .gradient-celebration {
+    background: var(--gradient-celebration);
+  }
+}
+
+@layer utilities {
+  .mascot-bounce {
+    animation: mascot-bounce 2s ease-in-out infinite;
+  }
+
+  .mascot-celebrate {
+    animation: mascot-celebrate 0.6s ease-in-out infinite;
+  }
+
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .sparkle {
+    animation: sparkle 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes mascot-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes mascot-celebrate {
+  0%, 100% { transform: rotate(-5deg) scale(1); }
+  25% { transform: rotate(5deg) scale(1.05); }
+  50% { transform: rotate(-5deg) scale(1.1); }
+  75% { transform: rotate(5deg) scale(1.05); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px hsl(170 60% 45% / 0.3); }
+  50% { box-shadow: 0 0 40px hsl(170 60% 45% / 0.6); }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-bounce,
+  .mascot-celebrate,
+  .pulse-glow,
+  .sparkle {
+    animation: none;
+  }
+}
