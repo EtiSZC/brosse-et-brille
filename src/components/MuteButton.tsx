@@ -15,7 +15,7 @@ const MuteButton = ({ className }: MuteButtonProps) => {
     <button
       onClick={() => setMuted(!muted)}
       className={cn(
-        "w-14 h-14 rounded-full bg-white/70 hover:bg-white shadow-md flex items-center justify-center text-2xl transition-colors",
+        "w-14 h-14 rounded-full bg-white/80 hover:bg-white border-[3px] border-ink/15 shadow-md flex items-center justify-center text-2xl transition-colors",
         className,
       )}
       aria-label={muted ? "Activer le son" : "Couper le son"}

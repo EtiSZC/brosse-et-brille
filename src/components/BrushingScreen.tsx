@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import mascotImg from "@/assets/mascot.png";
 import { BRUSHING_ZONES, TOTAL_DURATION, getZoneAt } from "@/data/brushingZones";
-import ProgressBar from "./ProgressBar";
-import ToothDiagram from "./ToothDiagram";
+import BathroomBackground from "./BathroomBackground";
+import BubbleTimer from "./BubbleTimer";
+import MouthDiagram from "./mouth/MouthDiagram";
 import MuteButton from "./MuteButton";
+import SpeechBubble from "./SpeechBubble";
 import { Button } from "@/components/ui/button";
 import { playZoneComplete, unlockAudio } from "@/lib/sounds";
 import { useWakeLock } from "@/hooks/use-wake-lock";
@@ -72,98 +74,73 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
     setPaused(false);
   };
 
-  const globalProgress = elapsed / TOTAL_DURATION;
-  const zoneProgress = zoneElapsed / currentZone.durationSeconds;
+  // Smooth sub-second progress inside the zone (drives the bubble fill and germ popping).
+  const zoneProgress = Math.min(
+    1,
+    Math.max(0, (elapsedMs / 1000 - (elapsed - zoneElapsed)) / currentZone.durationSeconds),
+  );
   const remainingTotal = TOTAL_DURATION - elapsed;
   const mins = Math.floor(remainingTotal / 60);
   const secs = remainingTotal % 60;
   const remainingLabel = `${mins}:${secs.toString().padStart(2, "0")}`;
 
   return (
-    <div
-      className="relative flex flex-col items-center justify-between min-h-screen px-4 py-6 sm:px-6 sm:py-8 transition-colors duration-700"
-      style={{
-        background: `linear-gradient(180deg, hsl(${currentZone.hue} 80% 92%) 0%, hsl(${currentZone.hue} 60% 96%) 100%)`,
-      }}
-    >
-      <MuteButton className="absolute top-4 left-4" />
-
-      {/* Quit: opens the pause screen instead of cancelling right away */}
-      <button
-        onClick={() => setPaused(true)}
-        className="absolute top-4 right-4 w-14 h-14 rounded-full bg-white/70 hover:bg-white shadow-md flex items-center justify-center text-xl text-foreground transition-colors"
-        aria-label="Arrêter"
-      >
-        ✕
-      </button>
-
-      {/* Timer */}
-      <div className="text-center">
-        <motion.p
-          className="text-5xl sm:text-6xl font-display font-bold text-foreground"
-          key={remainingTotal}
-          initial={{ scale: 1.1 }}
-          animate={{ scale: 1 }}
-          transition={{ duration: 0.2 }}
-        >
-          {remainingLabel}
-        </motion.p>
-        <ProgressBar progress={globalProgress} />
-      </div>
-
-      {/* Visual zone area */}
-      <div className="flex flex-col items-center flex-1 justify-center gap-3">
-        {/* Tooth diagram + direction arrow side by side */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentZoneIndex}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.4 }}
-            className="flex items-center gap-4 sm:gap-6"
+    <BathroomBackground tint={`hsl(${currentZone.hue} 90% 84% / 0.55)`}>
+      <div className="flex flex-col items-center flex-1 px-4 pt-4 pb-6 gap-3 sm:gap-4">
+        {/* Top bar: mute · small parent timer · stop */}
+        <div className="w-full max-w-md flex items-center justify-between">
+          <MuteButton />
+          <p
+            className="px-4 py-1 rounded-full bg-white/70 border-2 border-ink/15 text-lg font-display font-semibold text-ink tabular-nums"
+            aria-label={`Temps restant ${remainingLabel}`}
           >
-            <ToothDiagram activeRegions={currentZone.highlight} hue={currentZone.hue} />
-            <motion.img
-              src={mascotImg}
-              alt="Brillou"
-              className="w-20 h-20 sm:w-28 sm:h-28 mascot-bounce drop-shadow-lg"
-            />
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Small text label (for readers) */}
-        <AnimatePresence mode="wait">
-          <motion.p
-            key={currentZoneIndex}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="text-sm sm:text-base text-muted-foreground font-body text-center max-w-xs"
+            {remainingLabel}
+          </p>
+          {/* Quit: opens the pause screen instead of cancelling right away */}
+          <button
+            onClick={() => setPaused(true)}
+            className="w-14 h-14 rounded-full bg-white/80 hover:bg-white border-[3px] border-ink/15 shadow-md flex items-center justify-center text-xl text-ink transition-colors"
+            aria-label="Arrêter"
           >
-            {currentZone.emoji} {currentZone.label} — {currentZone.instruction}
-          </motion.p>
-        </AnimatePresence>
-
-        {/* Zone mini progress */}
-        <div className="w-48 h-2.5 rounded-full bg-muted/50 overflow-hidden">
-          <motion.div
-            className="h-full rounded-full"
-            style={{ backgroundColor: `hsl(${currentZone.hue}, 65%, 55%)` }}
-            animate={{ width: `${zoneProgress * 100}%` }}
-            transition={{ duration: 0.5 }}
-          />
+            ✕
+          </button>
         </div>
-        <p className="text-xs text-muted-foreground font-body">
-          {currentZoneIndex + 1} / {BRUSHING_ZONES.length}
-        </p>
-      </div>
 
-      {/* Encouragements + pause */}
-      <div className="flex flex-col items-center gap-4">
+        <BubbleTimer
+          currentZoneIndex={currentZoneIndex}
+          zoneProgress={zoneProgress}
+          totalProgress={elapsed / TOTAL_DURATION}
+        />
+
+        {/* The mouth */}
+        <div className="flex-1 w-full flex items-center justify-center">
+          <MouthDiagram currentZoneIndex={currentZoneIndex} zoneProgress={zoneProgress} />
+        </div>
+
+        {/* Brillou explains the current zone */}
+        <div className="w-full max-w-md flex items-center gap-3">
+          <img src={mascotImg} alt="Brillou" className="w-24 h-24 sm:w-28 sm:h-28 shrink-0 mascot-bounce drop-shadow-lg" />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentZoneIndex}
+              className="flex-1"
+              initial={{ opacity: 0, x: 20, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -20, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            >
+              <SpeechBubble>
+                <p className="font-display font-semibold text-xl sm:text-2xl leading-snug text-ink">
+                  {currentZone.instruction}
+                </p>
+              </SpeechBubble>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Encouragement + pause */}
         <motion.p
-          className="text-sm text-muted-foreground font-body italic"
+          className="text-base text-muted-foreground font-body font-semibold italic text-center"
           key={Math.floor(elapsed / 15)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -173,10 +150,13 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
         </motion.p>
         <button
           onClick={() => setPaused(true)}
-          className="w-16 h-16 rounded-full bg-white/80 hover:bg-white shadow-lg flex items-center justify-center text-3xl transition-colors active:scale-95"
+          className="w-16 h-16 rounded-full bg-white border-[3px] border-ink shadow-[0_5px_0_hsl(var(--ink)/0.25)] active:translate-y-1 active:shadow-none flex items-center justify-center transition-[transform,box-shadow]"
           aria-label="Pause"
         >
-          ⏸️
+          <span className="flex gap-1.5" aria-hidden>
+            <span className="w-2.5 h-7 rounded-full bg-ink" />
+            <span className="w-2.5 h-7 rounded-full bg-ink" />
+          </span>
         </button>
       </div>
 
@@ -184,7 +164,7 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
       <AnimatePresence>
         {paused && (
           <motion.div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-white/85 backdrop-blur-sm px-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 backdrop-blur-sm px-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -192,23 +172,31 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
             aria-modal="true"
             aria-labelledby="pause-title"
           >
-            <img src={mascotImg} alt="" className="w-32 h-32 drop-shadow-lg" />
-            <h2 id="pause-title" className="text-4xl font-display font-bold text-foreground">
-              Pause
-            </h2>
-            <p className="text-lg text-muted-foreground font-body text-center max-w-xs">
-              Brillou t'attend ! Encore {remainingLabel} de brossage.
-            </p>
-            <Button variant="hero" size="lg" onClick={handleResume} autoFocus>
-              ▶️ Continuer
-            </Button>
-            <Button variant="outline" onClick={onCancel}>
-              Arrêter
-            </Button>
+            <motion.div
+              className="w-full max-w-sm flex flex-col items-center gap-4 bg-white border-[3px] border-ink rounded-[2rem] px-6 pt-6 pb-8 shadow-[0_8px_0_hsl(var(--ink)/0.2)]"
+              initial={{ scale: 0.85, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.85, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 22 }}
+            >
+              <img src={mascotImg} alt="" className="w-28 h-28 drop-shadow-lg" />
+              <h2 id="pause-title" className="text-4xl font-display font-bold sticker-title">
+                Pause
+              </h2>
+              <p className="text-lg text-muted-foreground font-body font-semibold text-center">
+                Brillou t'attend ! Encore {remainingLabel} de brossage.
+              </p>
+              <Button variant="hero" size="lg" onClick={handleResume} autoFocus className="mt-2">
+                ▶ Continuer
+              </Button>
+              <Button variant="outline" onClick={onCancel}>
+                Arrêter
+              </Button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </BathroomBackground>
   );
 };
 

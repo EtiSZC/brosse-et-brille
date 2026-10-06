@@ -82,6 +82,32 @@ function playTone(frequency: number, duration: number, type: OscillatorType = 's
   osc.stop(c.currentTime + startTime + duration);
 }
 
+/** Tone whose pitch slides from `from` to `to` Hz — bubble-like when short. */
+function playSweep(from: number, to: number, duration: number, startTime = 0, volume = 0.18) {
+  if (muted) return;
+  const c = getCtx();
+  if (!c) return;
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.connect(gain);
+  gain.connect(c.destination);
+
+  const t0 = c.currentTime + startTime;
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(from, t0);
+  osc.frequency.exponentialRampToValueAtTime(to, t0 + duration);
+  gain.gain.setValueAtTime(volume, t0);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+
+  osc.start(t0);
+  osc.stop(t0 + duration);
+}
+
+export function playPop() {
+  // A germ bursting like a soap bubble
+  playSweep(600, 900, 0.09);
+}
+
 export function playFanfare() {
   // A cheerful ascending fanfare
   const notes = [
@@ -102,15 +128,16 @@ export function playStarSound() {
 }
 
 export function playZoneComplete() {
-  // Short happy chime for zone transition
-  playTone(800, 0.1, 'triangle', 0);
-  playTone(1000, 0.15, 'triangle', 0.1);
+  // Xylophone-like C-E-G chime for zone transition
+  playTone(1046.5, 0.18, 'triangle', 0);    // C6
+  playTone(1318.5, 0.18, 'triangle', 0.09); // E6
+  playTone(1568, 0.3, 'triangle', 0.18);    // G6
 }
 
 export function playStartSound() {
-  // Playful start sound
-  playTone(400, 0.1, 'square', 0);
-  playTone(500, 0.1, 'square', 0.1);
-  playTone(600, 0.1, 'square', 0.2);
-  playTone(800, 0.2, 'square', 0.3);
+  // Rising soap-bubble pops
+  playSweep(400, 600, 0.1, 0);
+  playSweep(500, 750, 0.1, 0.1);
+  playSweep(600, 900, 0.1, 0.2);
+  playSweep(750, 1150, 0.16, 0.3);
 }
