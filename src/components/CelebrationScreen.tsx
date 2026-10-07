@@ -23,6 +23,8 @@ const CelebrationScreen = ({ results, onDone, onAlbum }: CelebrationScreenProps)
   const names = joinNames(results.map((r) => r.profile));
   const hasPlayed = useRef(false);
   const speakTimer = useRef<ReturnType<typeof setTimeout>>();
+  // Fixed for the lifetime of this screen (the sounds effect below runs once).
+  const celebrationLine = useRef(together ? CELEBRATION_LINE_TOGETHER : CELEBRATION_LINE);
 
   useEffect(() => {
     if (hasPlayed.current) return;
@@ -32,7 +34,7 @@ const CelebrationScreen = ({ results, onDone, onAlbum }: CelebrationScreenProps)
     playFanfare();
     setTimeout(() => playStarSound(), 800);
     setTimeout(() => playStarSound(), 1200);
-    speakTimer.current = setTimeout(() => speak(together ? CELEBRATION_LINE_TOGETHER : CELEBRATION_LINE), 1500);
+    speakTimer.current = setTimeout(() => speak(celebrationLine.current), 1500);
 
     // Confetti bursts
     const fire = (opts: confetti.Options) => {
