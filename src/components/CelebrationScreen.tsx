@@ -6,20 +6,21 @@ import { Button } from "@/components/ui/button";
 import BathroomBackground from "@/components/BathroomBackground";
 import { playFanfare, playStarSound } from "@/lib/sounds";
 import { speak, stopSpeaking } from "@/lib/voice";
-import { CELEBRATION_LINE } from "@/data/voiceLines";
-import type { SessionResult } from "@/lib/progress";
+import { CELEBRATION_LINE, CELEBRATION_LINE_TOGETHER } from "@/data/voiceLines";
+import { joinNames, type ProfileSessionResult } from "@/lib/progress";
 
 interface CelebrationScreenProps {
-  /** What this session earned (null if it couldn't be recorded). */
-  result: SessionResult | null;
+  /** What this session earned, one entry per child who brushed (several = together). */
+  results: ProfileSessionResult[];
   /** Ends the moment and goes home ("À ce soir !" / "À demain !"). */
   onDone: () => void;
   onAlbum: () => void;
 }
 
-const CelebrationScreen = ({ result, onDone, onAlbum }: CelebrationScreenProps) => {
-  const evening = result?.slot === "evening";
-  const sticker = result?.newSticker ?? null;
+const CelebrationScreen = ({ results, onDone, onAlbum }: CelebrationScreenProps) => {
+  const evening = results[0]?.slot === "evening";
+  const together = results.length > 1;
+  const names = joinNames(results.map((r) => r.profile));
   const hasPlayed = useRef(false);
   const speakTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -31,7 +32,7 @@ const CelebrationScreen = ({ result, onDone, onAlbum }: CelebrationScreenProps) 
     playFanfare();
     setTimeout(() => playStarSound(), 800);
     setTimeout(() => playStarSound(), 1200);
-    speakTimer.current = setTimeout(() => speak(CELEBRATION_LINE), 1500);
+    speakTimer.current = setTimeout(() => speak(together ? CELEBRATION_LINE_TOGETHER : CELEBRATION_LINE), 1500);
 
     // Confetti bursts
     const fire = (opts: confetti.Options) => {
@@ -81,7 +82,7 @@ const CelebrationScreen = ({ result, onDone, onAlbum }: CelebrationScreenProps) 
           transition={{ delay: 0.4, duration: 0.6 }}
           className="text-5xl sm:text-6xl font-display font-bold text-center mt-2 mb-2 sticker-title"
         >
-          Bravo ! 🎉
+          {names ? `Bravo ${names}\u00A0!` : "Bravo\u00A0! 🎉"}
         </motion.h1>
 
         <motion.p
@@ -90,24 +91,42 @@ const CelebrationScreen = ({ result, onDone, onAlbum }: CelebrationScreenProps) 
           transition={{ delay: 0.6, duration: 0.5 }}
           className="text-lg sm:text-xl text-muted-foreground font-body font-semibold text-center mb-4 max-w-xs"
         >
-          Tes dents sont toutes propres et brillantes ! ✨🦷
+          {together ? "Vos" : "Tes"} dents sont toutes propres et brillantes ! ✨🦷
         </motion.p>
 
-        {sticker ? (
-          // New sticker flips in like a card
-          <motion.div
-            className="flex flex-col items-center gap-1 bg-white border-[3px] border-ink rounded-3xl px-8 py-4 mb-6 shadow-[0_6px_0_hsl(var(--ink)/0.18)]"
-            initial={{ rotateY: 180, scale: 0.6, opacity: 0 }}
-            animate={{ rotateY: 0, scale: 1, opacity: 1 }}
-            transition={{ delay: 1.1, type: "spring", stiffness: 120, damping: 12 }}
-            style={{ transformPerspective: 800 }}
-          >
-            <span className="font-display font-semibold text-sm text-ink/70">Nouvel autocollant !</span>
-            <span className="text-6xl leading-none sparkle" aria-hidden>
-              {sticker.emoji}
-            </span>
-            <span className="font-display font-bold text-lg text-ink">{sticker.name}</span>
-          </motion.div>
+        {results.some((r) => r.newSticker) ? (
+          // New sticker(s) flip in like cards — one per child when brushing together
+          <div className="flex flex-wrap justify-center gap-3 mb-6">
+            {results.map((r, i) => (
+              <motion.div
+                key={r.profile.id}
+                className={
+                  "flex flex-col items-center gap-1 bg-white border-[3px] border-ink rounded-3xl shadow-[0_6px_0_hsl(var(--ink)/0.18)] " +
+                  (together ? "px-3 py-3 w-[44%] max-w-[10rem]" : "px-8 py-4")
+                }
+                initial={{ rotateY: 180, scale: 0.6, opacity: 0 }}
+                animate={{ rotateY: 0, scale: 1, opacity: 1 }}
+                transition={{ delay: 1.1 + i * 0.25, type: "spring", stiffness: 120, damping: 12 }}
+                style={{ transformPerspective: 800 }}
+              >
+                <span className="font-display font-semibold text-sm text-ink/70 text-center">
+                  {together ? `${r.profile.avatar} ${r.profile.name || "Moi"}` : "Nouvel autocollant !"}
+                </span>
+                {r.newSticker ? (
+                  <>
+                    <span className={(together ? "text-5xl" : "text-6xl") + " leading-none sparkle"} aria-hidden>
+                      {r.newSticker.emoji}
+                    </span>
+                    <span className="font-display font-bold text-lg text-ink">{r.newSticker.name}</span>
+                  </>
+                ) : (
+                  <span className="text-sm font-body font-semibold text-muted-foreground text-center">
+                    Déjà gagné {evening ? "ce soir" : "ce matin"} 😉
+                  </span>
+                )}
+              </motion.div>
+            ))}
+          </div>
         ) : (
           <motion.div
             initial={{ opacity: 0, scale: 0 }}
@@ -129,7 +148,7 @@ const CelebrationScreen = ({ result, onDone, onAlbum }: CelebrationScreenProps) 
                 </motion.span>
               ))}
             </div>
-            {result && (
+            {results.length > 0 && (
               <p className="text-sm text-muted-foreground font-body font-semibold text-center max-w-xs">
                 Tu as déjà ton autocollant {evening ? "de ce soir" : "de ce matin"} 😉
               </p>

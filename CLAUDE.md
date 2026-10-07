@@ -52,7 +52,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 
 ## Architecture
 
-- `src/pages/Index.tsx` — state machine: `home` → `brushing` → `celebration`, plus `album`. On completion it calls `recordSession()` and passes the result (slot, new sticker, streak) to the celebration.
+- `src/pages/Index.tsx` — state machine: `who` (picker, start screen when ≥ 2 profiles) → `home` → `brushing` → `celebration`, plus `album` and `parents`. On completion it calls `recordSessions()` (one entry per active child) and passes the results to the celebration.
 - `src/components/BathroomBackground.tsx` — shared "candy bathroom" scene (tiles, optional tint, rising bubbles, foam). Every screen renders inside it.
 - `src/components/HomeScreen.tsx` — sticker title, Brillou + speech bubble, `WeekCalendar` + streak, 📒 album button (top right, sticker-count badge), breathing 72px start button (`size="xl"`).
 - `src/components/BrushingScreen.tsx` — timestamp-based timer (`Date.now()` deltas, survives pauses), zone via `getZoneAt()` and phase via `getPhaseAt()` (fractional seconds), pause overlay (✕ and ⏸ both open it; "Arrêter" there cancels), auto-pause on `visibilitychange`, Wake Lock. At 3:00 shows "Bravo, tout brille !" + sparkle wave for 1.8 s, then `onComplete` (once). Layout: small parent timer, `BubbleTimer`, `MouthDiagram` + `MiniMap`, Brillou + `SpeechBubble` with the phase instruction.
@@ -65,7 +65,10 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - `src/components/mouth/MiniMap.tsx` — tiny 2×3 map of the mouth showing the current area (dashed row = inside, ▲ = top).
 - `src/components/BubbleTimer.tsx` — 8 bubbles in 2 groups of 4 (blue upper / peach lower) filling up, then a star. `role="progressbar"`.
 - `src/components/CelebrationScreen.tsx` — brand-colour confetti, fanfare, Lily's "Bravo", new-sticker card (or stars + kind note if the slot was already filled), CTA "☀️ À ce soir !" (morning) / "🌙 À demain !" (evening) back to home, "📒 Mon album".
-- `src/lib/progress.ts` — on-device history (localStorage `brosse-brille:progress:v1`, versioned, per-profile with a single `default` profile for now): `recordSession` (morning < 14 h ≤ evening; one session and one random not-yet-earned sticker per slot), forgiving `streakOf` (≥ 1 slot per day; today not done yet doesn't break it), `weekOf` (Monday → Sunday), 20 `STICKERS` (never germ-themed). Unit-tested.
+- `src/lib/progress.ts` — on-device history per child (localStorage `brosse-brille:progress:v2`: `profiles` [{id, name, avatar}], `data` per profile, `active` ids). Migrates the v1 single-child key on first run **without deleting it** (so the v0.5 APK still finds its data). Profiles: `addProfile` (max 4, 8 animal `AVATARS`), `updateProfile`, `deleteProfile` (never the last one), `setActiveProfiles`, `recordSessions` (brushing together: one slot + one sticker draw per child), `displayName` / `joinNames`. `recordSession` (morning < 14 h ≤ evening; one session and one random not-yet-earned sticker per slot), forgiving `streakOf` (≥ 1 slot per day; today not done yet doesn't break it), `weekOf` (Monday → Sunday), 20 `STICKERS` (never germ-themed). Unit-tested.
+- `src/components/ProfilePicker.tsx` — "Qui se brosse les dents ?": one tap = one child; "Brosser ensemble" = multi-select; parents gate.
+- `src/components/ParentsScreen.tsx` — add / rename / avatar / delete (with confirmation) profiles. Reached only through `LongPressButton` (hold 2 s; touch, mouse and keyboard).
+- Home: active-profile chip (≥ 2 profiles), greeting with the name, one compact line per child when brushing together, "⚙︎ Parents" gate at the bottom. Album: one tab per child. Celebration: "Bravo Léa et Tom !", one sticker card per child, plural voice line.
 - `src/components/WeekCalendar.tsx` — ☀️/🌙 per day for the current week, today outlined, streak chip ("🔥 3 jours de suite !").
 - `src/components/StickerAlbum.tsx` — 4-column grid of the 20 stickers (earned vs dashed "?"), counter, back button.
 - `src/components/MuteButton.tsx`, `SpeechBubble.tsx` — small shared UI.
@@ -86,7 +89,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - Guidance must work for **pre-readers**: visual and audio first, text secondary.
 - Screen is **propped on the sink, ~60 cm away**: large, glanceable elements.
 - Mirror convention: screen-left = child's left.
-- **Privacy**: no accounts, no tracking, no third-party SDKs; all data stays on device (COPPA / GDPR-K).
+- **Privacy**: no accounts, no tracking, no third-party SDKs; all data stays on device (COPPA / GDPR-K). Child profiles hold only a first name/nickname and an emoji avatar — no photo, age or surname.
 - **No dark patterns**: no ads, currency, loot boxes, guilt ("Brillou est triste"), streak punishment, or extra screen time after brushing. No scoring of brushing quality. Brushing twice in the same slot never earns an extra sticker; the end of a session points back to the next brushing ("À ce soir !"), not to more screen time.
 
 ## Restore points (git tags)
@@ -120,4 +123,5 @@ npm run android    # rebuild + reinstall on the phone
    - **8 steps / 180 s**, same order per arch: Devant 22 s → Derrière (front + molars, inner side) 22 s → Fond gauche 23 s (cheek side 11 s, then top 12 s) → Fond droite 23 s; upper then lower. BubbleTimer: 8 bubbles in 2 groups of 4.
 3. ✅ **Guidance** (done 2026-10-07, merged; voice = pre-recorded ElevenLabs Lily clips) — Brillou speaks each instruction (pre-recorded Lily clips, device TTS fallback), stops on pause and repeats on resume, "Bravo" at the end; 3-2-1 badge + tick before each step/view change; pulsing side arrow for back-teeth steps (words kept in the bubble for parents).
 4. ✅ **Retention** (done 2026-10-07, merged; validated on the phone) — sun/moon weekly calendar on home; forgiving day streak; one random sticker per new morning/evening slot (20 emoji stickers, never twice the same; album screen); celebration CTA "À ce soir !" / "À demain !" instead of "Recommencer". All on device, per-profile data model ready for child profiles.
-5. **Later** — Brillou poses (needs illustration), child profiles, gated parent corner, optional local reminders, music mode, signed release build for Google Play.
+5. ✅ **Child profiles** (done 2026-10-07, branch `phase-5-profiles`; awaiting phone test) — up to 4 profiles (name + animal emoji), "Qui se brosse les dents ?" picker when ≥ 2, brushing together (each child gets their slot and sticker), per-child calendar/streak/album, parents screen behind a 2 s long press. Names shown on screen, never spoken or sent anywhere.
+6. **Later** — Brillou poses (needs illustration), parent corner with history/tips, optional local reminders, music mode, signed release build for Google Play (+ paid ElevenLabs plan and regenerated clips for commercial use).

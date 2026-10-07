@@ -5,7 +5,8 @@ import { BRUSHING_ZONES } from "./brushingZones.ts";
 
 export const FINISH_LINE = "Bravo, tout brille\u00A0!";
 export const CELEBRATION_LINE = "Bravo\u00A0! Tes dents sont toutes propres et brillantes\u00A0!";
+export const CELEBRATION_LINE_TOGETHER = "Bravo\u00A0! Vos dents sont toutes propres et brillantes\u00A0!";
 
 export const VOICE_LINES: string[] = [
-  ...new Set([...BRUSHING_ZONES.flatMap((z) => z.phases.map((p) => p.instruction)), FINISH_LINE, CELEBRATION_LINE]),
+  ...new Set([...BRUSHING_ZONES.flatMap((z) => z.phases.map((p) => p.instruction)), FINISH_LINE, CELEBRATION_LINE, CELEBRATION_LINE_TOGETHER]),
 ];

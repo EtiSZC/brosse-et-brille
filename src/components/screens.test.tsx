@@ -8,12 +8,14 @@ import { STICKERS, recordSession } from "@/lib/progress";
 vi.mock("@/lib/voice", () => ({ speak: vi.fn(), stopSpeaking: vi.fn(), preloadVoice: vi.fn() }));
 vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
 
+const KID = { id: "default", name: "", avatar: "🦊" };
+
 describe("retention screens", () => {
   beforeEach(() => localStorage.clear());
 
   it("celebration: shows the new sticker and says 'À ce soir' in the morning", () => {
     render(
-      <CelebrationScreen result={{ slot: "morning", newSticker: STICKERS[0], streak: 1 }} onDone={() => {}} onAlbum={() => {}} />,
+      <CelebrationScreen results={[{ slot: "morning", newSticker: STICKERS[0], streak: 1, profile: KID }]} onDone={() => {}} onAlbum={() => {}} />,
     );
     expect(screen.getByText("Nouvel autocollant !")).toBeInTheDocument();
     expect(screen.getByText(STICKERS[0].name)).toBeInTheDocument();
@@ -21,7 +23,7 @@ describe("retention screens", () => {
   });
 
   it("celebration: says 'À demain' in the evening, with a kind note if the slot was already filled", () => {
-    render(<CelebrationScreen result={{ slot: "evening", newSticker: null, streak: 2 }} onDone={() => {}} onAlbum={() => {}} />);
+    render(<CelebrationScreen results={[{ slot: "evening", newSticker: null, streak: 2, profile: KID }]} onDone={() => {}} onAlbum={() => {}} />);
     expect(screen.getByRole("button", { name: /À demain/ })).toBeInTheDocument();
     expect(screen.getByText(/déjà ton autocollant de ce soir/)).toBeInTheDocument();
     expect(screen.queryByText("Nouvel autocollant !")).not.toBeInTheDocument();
@@ -29,7 +31,7 @@ describe("retention screens", () => {
 
   it("home: shows the week calendar and the album with its sticker count", () => {
     recordSession(new Date());
-    render(<HomeScreen onStart={() => {}} onAlbum={() => {}} />);
+    render(<HomeScreen onStart={() => {}} onAlbum={() => {}} onSwitch={() => {}} onParents={() => {}} />);
     expect(screen.getByRole("img", { name: /Cette semaine : 1 brossage/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Mon album : 1 autocollants sur 20/ })).toBeInTheDocument();
   });

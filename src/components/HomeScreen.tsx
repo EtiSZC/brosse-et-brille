@@ -6,25 +6,44 @@ import BathroomBackground from "@/components/BathroomBackground";
 import MuteButton from "@/components/MuteButton";
 import SpeechBubble from "@/components/SpeechBubble";
 import WeekCalendar from "@/components/WeekCalendar";
-import { STICKERS, getProfile, streakOf, weekOf } from "@/lib/progress";
+import LongPressButton from "@/components/LongPressButton";
+import { STICKERS, displayName, getActiveProfiles, getProfile, listProfiles, streakOf, weekOf } from "@/lib/progress";
 import { playStartSound, unlockAudio } from "@/lib/sounds";
 
 interface HomeScreenProps {
   onStart: () => void;
   onAlbum: () => void;
+  /** Change who is brushing (shown with 2+ profiles). */
+  onSwitch: () => void;
+  onParents: () => void;
 }
 
 const TITLE = "Brosse & Brille";
 // Small fixed tilt per letter for a hand-stuck sticker look.
 const TILTS = [-3, 2, -2, 3, -1, 2, 0, -2, 0, 3, -2, 2, -3, 1, -2];
 
-const HomeScreen = ({ onStart, onAlbum }: HomeScreenProps) => {
+const HomeScreen = ({ onStart, onAlbum, onSwitch, onParents }: HomeScreenProps) => {
   // Read once per visit to the home screen (the history only changes after a session).
-  const { week, streak, stickerCount } = useMemo(() => {
-    const profile = getProfile();
+  const { kids, multiProfile } = useMemo(() => {
     const now = new Date();
-    return { week: weekOf(profile.sessions, now), streak: streakOf(profile.sessions, now), stickerCount: profile.stickers.length };
+    const kids = getActiveProfiles().map((meta) => {
+      const history = getProfile(meta.id);
+      return {
+        meta,
+        week: weekOf(history.sessions, now),
+        streak: streakOf(history.sessions, now),
+        stickerCount: history.stickers.length,
+      };
+    });
+    return { kids, multiProfile: listProfiles().length >= 2 };
   }, []);
+  const together = kids.length > 1;
+  const { week, streak, stickerCount } = kids[0];
+  const greeting = together
+    ? "On brosse tous ensemble\u00A0?"
+    : kids[0].meta.name
+      ? `On brosse ensemble, ${kids[0].meta.name}\u00A0?`
+      : "On brosse ensemble\u00A0?";
 
   const handleStart = () => {
     unlockAudio(); // inside the tap: allows the timer-driven chimes on iOS
@@ -49,13 +68,26 @@ const HomeScreen = ({ onStart, onAlbum }: HomeScreenProps) => {
           )}
         </button>
 
+        {/* Who is brushing (tap to change) */}
+        {multiProfile && (
+          <button
+            onClick={onSwitch}
+            className="absolute top-5 left-1/2 -translate-x-1/2 h-12 px-4 rounded-full bg-white border-[3px] border-ink shadow-[0_4px_0_hsl(var(--ink)/0.15)] flex items-center gap-2 font-display font-bold text-ink max-w-[50%]"
+            aria-label={`Changer d'enfant (actuellement ${kids.map((k) => displayName(k.meta)).join(" et ")})`}
+          >
+            <span className="text-2xl leading-none">{kids.map((k) => k.meta.avatar).join("")}</span>
+            {!together && <span className="truncate">{displayName(kids[0].meta)}</span>}
+            <span aria-hidden>▾</span>
+          </button>
+        )}
+
         <motion.div
           initial={{ opacity: 0, y: 10, scale: 0.8 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ delay: 0.6, type: "spring", stiffness: 260, damping: 18 }}
         >
           <SpeechBubble tail="bottom" className="mb-3">
-            <p className="font-display font-semibold text-xl text-ink">On brosse ensemble ?</p>
+            <p className="font-display font-semibold text-xl text-ink">{greeting}</p>
           </SpeechBubble>
         </motion.div>
 
@@ -106,7 +138,31 @@ const HomeScreen = ({ onStart, onAlbum }: HomeScreenProps) => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55, duration: 0.4 }}
         >
-          <WeekCalendar week={week} streak={streak} />
+          {together ? (
+            // Brushing together: one compact line per child instead of several calendars
+            <ul className="w-full max-w-sm flex flex-col gap-2">
+              {kids.map((k) => {
+                const thisWeek = k.week.reduce((n, d) => n + Number(d.morning) + Number(d.evening), 0);
+                return (
+                  <li
+                    key={k.meta.id}
+                    className="flex items-center gap-3 bg-white/90 border-[3px] border-ink rounded-2xl px-3 py-2 font-display font-semibold text-ink"
+                  >
+                    <span className="text-3xl leading-none" aria-hidden>
+                      {k.meta.avatar}
+                    </span>
+                    <span className="flex-1 truncate">{displayName(k.meta)}</span>
+                    {k.streak > 0 && <span>🔥 {k.streak}</span>}
+                    <span className="text-sm text-ink/70">
+                      {thisWeek} cette semaine
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <WeekCalendar week={week} streak={streak} />
+          )}
         </motion.div>
 
         <motion.div
@@ -120,6 +176,13 @@ const HomeScreen = ({ onStart, onAlbum }: HomeScreenProps) => {
             </Button>
           </div>
         </motion.div>
+        <LongPressButton
+          onLongPress={onParents}
+          label="Espace parents : maintenir 2 secondes"
+          className="absolute bottom-5 left-1/2 -translate-x-1/2 h-9 text-sm"
+        >
+          ⚙︎ Parents
+        </LongPressButton>
       </div>
     </BathroomBackground>
   );

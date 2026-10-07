@@ -1,6 +1,6 @@
-// Brushing history, streak and stickers — stored on the device only (no account,
-// nothing sent anywhere). Data is keyed by profile from day one so child profiles
-// can be added later; for now everything uses the "default" profile.
+// Brushing history, streak and stickers per child profile — stored on the device
+// only (no account, nothing sent anywhere). Up to 4 profiles (first name/nickname
+// + animal avatar); one or several can be "active" (brushing together).
 
 export type Slot = "morning" | "evening";
 
@@ -16,13 +16,32 @@ interface ProfileData {
   stickers: string[];
 }
 
+export interface ProfileMeta {
+  id: string;
+  /** First name or nickname; may be empty (e.g. the profile migrated from v1). */
+  name: string;
+  avatar: string;
+}
+
 interface ProgressData {
+  version: 2;
+  profiles: ProfileMeta[];
+  data: Record<string, ProfileData>;
+  /** Profiles brushing right now (several = brushing together). */
+  active: string[];
+}
+
+/** v1 (single child) — read once for migration, never deleted (restore point v0.5 still finds it). */
+interface ProgressDataV1 {
   version: 1;
   profiles: Record<string, ProfileData>;
 }
 
-const STORAGE_KEY = "brosse-brille:progress:v1";
+const STORAGE_KEY = "brosse-brille:progress:v2";
+const LEGACY_KEY_V1 = "brosse-brille:progress:v1";
 export const DEFAULT_PROFILE = "default";
+export const MAX_PROFILES = 4;
+export const AVATARS = ["🦊", "🐼", "🐯", "🐰", "🐸", "🐨", "🦁", "🐧"];
 
 /** The collection: one random not-yet-earned sticker per new morning/evening slot. Never germ-themed. */
 export const STICKERS = [
@@ -69,18 +88,37 @@ function addDays(d: Date, n: number): Date {
 // ---------------------------------------------------------------------------
 
 const emptyProfile = (): ProfileData => ({ sessions: [], stickers: [] });
+const readJson = <T,>(key: string): T | null => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null; // blocked or corrupted storage
+  }
+};
+
+/** Keep the data usable whatever happened: ≥ 1 profile, valid active selection. */
+function normalize(data: ProgressData): ProgressData {
+  if (!data.profiles.length) data.profiles = [{ id: DEFAULT_PROFILE, name: "", avatar: AVATARS[0] }];
+  const ids = new Set(data.profiles.map((p) => p.id));
+  data.active = data.active.filter((id) => ids.has(id));
+  if (!data.active.length) data.active = [data.profiles[0].id];
+  return data;
+}
 
 export function loadProgress(): ProgressData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const data = JSON.parse(raw) as ProgressData;
-      if (data?.version === 1 && data.profiles) return data;
-    }
-  } catch {
-    // Blocked or corrupted storage: start fresh (the app still works, just without memory).
-  }
-  return { version: 1, profiles: {} };
+  const v2 = readJson<ProgressData>(STORAGE_KEY);
+  if (v2?.version === 2 && Array.isArray(v2.profiles) && v2.data) return normalize(v2);
+
+  // First run of this version: migrate the single-child history if there is one.
+  const v1 = readJson<ProgressDataV1>(LEGACY_KEY_V1);
+  const data: ProgressData = {
+    version: 2,
+    profiles: [{ id: DEFAULT_PROFILE, name: "", avatar: AVATARS[0] }],
+    data: v1?.version === 1 && v1.profiles ? { ...v1.profiles } : {},
+    active: [DEFAULT_PROFILE],
+  };
+  return normalize(data);
 }
 
 function saveProgress(data: ProgressData) {
@@ -91,8 +129,65 @@ function saveProgress(data: ProgressData) {
   }
 }
 
-export function getProfile(profile = DEFAULT_PROFILE, data = loadProgress()): ProfileData {
-  return data.profiles[profile] ?? emptyProfile();
+/** History of one profile (the first active one by default). */
+export function getProfile(profile?: string, data = loadProgress()): ProfileData {
+  return data.data[profile ?? data.active[0]] ?? emptyProfile();
+}
+
+// ---------------------------------------------------------------------------
+// Profiles
+// ---------------------------------------------------------------------------
+
+export const listProfiles = (): ProfileMeta[] => loadProgress().profiles;
+
+/** Name shown on screen ("Moi" for the unnamed profile migrated from v1). */
+export const displayName = (p: ProfileMeta) => p.name || "Moi";
+
+/** "Léa", "Léa et Tom", "Léa, Tom et Zoé" — empty when nobody has a name yet. */
+export function joinNames(profiles: ProfileMeta[]): string {
+  const names = profiles.map((p) => p.name).filter(Boolean);
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`;
+}
+
+export function getActiveProfiles(): ProfileMeta[] {
+  const data = loadProgress();
+  return data.active.map((id) => data.profiles.find((p) => p.id === id)!);
+}
+
+export function setActiveProfiles(ids: string[]) {
+  const data = loadProgress();
+  data.active = ids;
+  saveProgress(normalize(data));
+}
+
+/** Returns the new profile, or null when the maximum is reached. */
+export function addProfile(name: string, avatar: string): ProfileMeta | null {
+  const data = loadProgress();
+  if (data.profiles.length >= MAX_PROFILES) return null;
+  const profile = { id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: name.trim(), avatar };
+  data.profiles.push(profile);
+  data.data[profile.id] = emptyProfile();
+  saveProgress(data);
+  return profile;
+}
+
+export function updateProfile(id: string, patch: Partial<Pick<ProfileMeta, "name" | "avatar">>) {
+  const data = loadProgress();
+  const profile = data.profiles.find((p) => p.id === id);
+  if (!profile) return;
+  if (patch.name !== undefined) profile.name = patch.name.trim();
+  if (patch.avatar !== undefined) profile.avatar = patch.avatar;
+  saveProgress(data);
+}
+
+/** Deletes a profile and its history. The last remaining profile can't be deleted. */
+export function deleteProfile(id: string): boolean {
+  const data = loadProgress();
+  if (data.profiles.length <= 1 || !data.profiles.some((p) => p.id === id)) return false;
+  data.profiles = data.profiles.filter((p) => p.id !== id);
+  delete data.data[id];
+  saveProgress(normalize(data));
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,9 +205,10 @@ export interface SessionResult {
  * Record a completed 3-minute session. Brushing twice in the same slot counts once.
  * The sticker is drawn at random among those not earned yet (`random` is injectable for tests).
  */
-export function recordSession(now = new Date(), profile = DEFAULT_PROFILE, random = Math.random): SessionResult {
+export function recordSession(now = new Date(), profile?: string, random = Math.random): SessionResult {
   const data = loadProgress();
-  const p = getProfile(profile, data);
+  const id = profile ?? data.active[0];
+  const p = getProfile(id, data);
   const session: Session = { date: toDay(now), slot: slotOf(now) };
   const alreadyFilled = p.sessions.some((s) => s.date === session.date && s.slot === session.slot);
 
@@ -123,9 +219,23 @@ export function recordSession(now = new Date(), profile = DEFAULT_PROFILE, rando
     newSticker = remaining.length ? remaining[Math.floor(random() * remaining.length)] : null;
     if (newSticker) p.stickers.push(newSticker.id);
   }
-  data.profiles[profile] = p;
+  data.data[id] = p;
   saveProgress(data);
   return { slot: session.slot, newSticker, streak: streakOf(p.sessions, now) };
+}
+
+export interface ProfileSessionResult extends SessionResult {
+  profile: ProfileMeta;
+}
+
+/** Brushing together: one session counts for each child, each with their own sticker draw. */
+export function recordSessions(ids?: string[], now = new Date(), random = Math.random): ProfileSessionResult[] {
+  const data = loadProgress();
+  const targets = (ids ?? data.active).filter((id) => data.profiles.some((p) => p.id === id));
+  return targets.map((id) => ({
+    ...recordSession(now, id, random),
+    profile: data.profiles.find((p) => p.id === id)!,
+  }));
 }
 
 /**

@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import BathroomBackground from "@/components/BathroomBackground";
-import { STICKERS, getProfile } from "@/lib/progress";
+import { STICKERS, displayName, getActiveProfiles, getProfile, listProfiles } from "@/lib/progress";
 import { cn } from "@/lib/utils";
 
 interface StickerAlbumProps {
@@ -9,7 +10,9 @@ interface StickerAlbumProps {
 
 /** The sticker collection: earned ones show their picture, the others a "?" card. */
 const StickerAlbum = ({ onBack }: StickerAlbumProps) => {
-  const earned = new Set(getProfile().stickers);
+  const profiles = listProfiles();
+  const [profileId, setProfileId] = useState(() => getActiveProfiles()[0].id);
+  const earned = new Set(getProfile(profileId).stickers);
   return (
     <BathroomBackground>
       <div className="flex flex-col items-center flex-1 px-4 pt-4 pb-24 gap-4">
@@ -27,7 +30,30 @@ const StickerAlbum = ({ onBack }: StickerAlbumProps) => {
           </span>
         </div>
 
-        <ul className="w-full max-w-md grid grid-cols-4 gap-3">
+        {/* One album per child */}
+        {profiles.length > 1 && (
+          <div className="w-full max-w-md flex justify-center gap-2" role="tablist" aria-label="Album de">
+            {profiles.map((p) => (
+              <button
+                key={p.id}
+                role="tab"
+                aria-selected={p.id === profileId}
+                onClick={() => setProfileId(p.id)}
+                className={cn(
+                  "h-12 px-3 rounded-full border-[3px] flex items-center gap-1.5 font-display font-bold text-ink",
+                  p.id === profileId ? "bg-mint border-ink" : "bg-white/70 border-ink/15",
+                )}
+              >
+                <span className="text-2xl leading-none" aria-hidden>
+                  {p.avatar}
+                </span>
+                <span className="max-w-[5rem] truncate">{displayName(p)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <ul key={profileId} className="w-full max-w-md grid grid-cols-4 gap-3">
           {STICKERS.map((s, i) => {
             const has = earned.has(s.id);
             return (
