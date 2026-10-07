@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import BathroomBackground from "@/components/BathroomBackground";
 import { playFanfare, playStarSound } from "@/lib/sounds";
 import { speak, stopSpeaking } from "@/lib/voice";
+import { CELEBRATION_LINE } from "@/data/voiceLines";
 
 interface CelebrationScreenProps {
   onRestart: () => void;
@@ -23,7 +24,7 @@ const CelebrationScreen = ({ onRestart }: CelebrationScreenProps) => {
     playFanfare();
     setTimeout(() => playStarSound(), 800);
     setTimeout(() => playStarSound(), 1200);
-    speakTimer.current = setTimeout(() => speak("Bravo\u00A0! Tes dents sont toutes propres et brillantes\u00A0!"), 1500);
+    speakTimer.current = setTimeout(() => speak(CELEBRATION_LINE), 1500);
 
     // Confetti bursts
     const fire = (opts: confetti.Options) => {

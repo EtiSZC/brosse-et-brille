@@ -27,6 +27,19 @@ npm run android   # build web → cap sync → gradle assembleDebug → adb inst
 
 Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capacitor/assets generate --android --iconBackgroundColor '#DFF7F0' --splashBackgroundColor '#DFF7F0'`. Fonts are bundled via `@fontsource` (no network needed at runtime).
 
+## Brillou's voice (ElevenLabs)
+
+Clips are generated once and bundled (offline, nothing sent at runtime). Voice **Lily** (`pFZP5JQG7iQjIQuC4Bku`), model `eleven_multilingual_v2`, stability 0.45 / similarity 0.8 / style 0.35 — chosen by the user on 2026-10-07.
+
+```bash
+node scripts/generate-voice.mjs   # after editing any instruction / line; only new or changed sentences are generated
+```
+
+- API key in `.env.local` (`ELEVENLABS_API_KEY`, git-ignored, never bundled — no `VITE_` prefix). The key lacks the "Voices: Read" permission.
+- Account is on the **free plan** (10,000 chars/month; the 12 lines ≈ 500 chars). Free plan: only default voices via API, and **no commercial use** — upgrade and regenerate before publishing the app.
+- A test fails if a sentence in `VOICE_LINES` has no clip (forgot to run the script).
+- Write non-breaking spaces as `\u00A0` in code (French typography before "!"); a raw NBSP character fails lint (`no-irregular-whitespace`).
+
 ## Stack
 
 React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `toaster`, `sonner`, `tooltip` are kept — add others with `npx shadcn add <name>`), framer-motion, canvas-confetti, vite-plugin-pwa. No backend, no persistence yet. Path alias `@/` → `src/`.
@@ -39,7 +52,8 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - `src/components/BrushingScreen.tsx` — timestamp-based timer (`Date.now()` deltas, survives pauses), zone via `getZoneAt()` and phase via `getPhaseAt()` (fractional seconds), pause overlay (✕ and ⏸ both open it; "Arrêter" there cancels), auto-pause on `visibilitychange`, Wake Lock. At 3:00 shows "Bravo, tout brille !" + sparkle wave for 1.8 s, then `onComplete` (once). Layout: small parent timer, `BubbleTimer`, `MouthDiagram` + `MiniMap`, Brillou + `SpeechBubble` with the phase instruction.
 - `src/components/mouth/geometry.ts` — pure, unit-tested logic: smile view (10 teeth per arch: 3 molars, 4 front, 3 molars; molars have cusps), top-down arch view (`ARCH_TEETH`), `targetIndices`, `spotlightWindow`, `zoomViewBox` (1.9× on molars for "side" phases), `brushPlan`/`brushPosition` (ping-pong path across every target tooth, molars back→front), `isSurfaceShiny` (matte → shiny when the brush's first pass reaches a tooth).
 - `src/components/mouth/MouthDiagram.tsx` — renders a step: `SmileView` (front / inside with see-through teeth and brush behind / zoomed molar side, zoom = animated SVG `viewBox`) or `ArchView` (top-down chewing surfaces); spotlight = ink veil 30% clipped to the mouth with a sliding window + sunshine corner frame; target teeth mint outline + glow + one "boing"; card-flip when the drawing changes; sparkle wave when finished.
-- `src/lib/voice.ts` — Brillou's voice: `speak()` / `stopSpeaking()` via `@capacitor-community/text-to-speech` (native Android TTS; browser falls back to `speechSynthesis`), fr-FR, rate 0.95, pitch 1.15, flushes the previous sentence, follows mute.
+- `src/lib/voice.ts` — Brillou's voice: `speak()` plays the pre-recorded ElevenLabs clip for that sentence (via `playClip` on the shared, tap-unlocked `AudioContext`); sentences without a clip fall back to `@capacitor-community/text-to-speech` (native Android TTS / browser `speechSynthesis`, fr-FR). Only the latest request may speak (`speechToken`); follows mute; `preloadVoice()` decodes all clips when brushing starts.
+- `src/data/voiceLines.ts` — every sentence Brillou says (derived from the zone instructions + finish/celebration lines). `src/data/voice-manifest.json` maps each sentence to its clip in `public/voice/`.
 - `src/components/Countdown.tsx` — 3-2-1 badge over the mouth during the last 3 s of each step/view (with `playTick`).
 - `src/components/SideMarker.tsx` — pulsing sunshine arrow on the edge of the screen for the side being brushed (back-teeth steps).
 - `src/components/mouth/MiniMap.tsx` — tiny 2×3 map of the mouth showing the current area (dashed row = inside, ▲ = top).

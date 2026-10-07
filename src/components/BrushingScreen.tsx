@@ -13,7 +13,8 @@ import MuteButton from "./MuteButton";
 import SpeechBubble from "./SpeechBubble";
 import { Button } from "@/components/ui/button";
 import { playPop, playTick, playZoneComplete, unlockAudio } from "@/lib/sounds";
-import { speak, stopSpeaking } from "@/lib/voice";
+import { preloadVoice, speak, stopSpeaking } from "@/lib/voice";
+import { FINISH_LINE } from "@/data/voiceLines";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 
 interface BrushingScreenProps {
@@ -92,7 +93,7 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
 
   // Brillou says each instruction when its step/view starts (just after the chime),
   // and "Bravo" at the end. Pausing cuts him off; resuming repeats the instruction.
-  const instruction = finished ? "Bravo, tout brille\u00A0!" : currentPhase.instruction;
+  const instruction = finished ? FINISH_LINE : currentPhase.instruction;
   useEffect(() => {
     if (paused) {
       stopSpeaking();
@@ -101,7 +102,10 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
     const id = setTimeout(() => speak(instruction), 400);
     return () => clearTimeout(id);
   }, [instruction, paused]);
-  useEffect(() => () => stopSpeaking(), []);
+  useEffect(() => {
+    preloadVoice();
+    return () => stopSpeaking();
+  }, []);
 
   // 3-2-1 before every change of step or view, with a soft tick on each number.
   const secondsLeftInPhase = currentPhase.durationSeconds - phaseElapsed;

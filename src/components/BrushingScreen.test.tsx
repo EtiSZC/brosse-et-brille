@@ -3,7 +3,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import BrushingScreen from "./BrushingScreen";
 import { speak, stopSpeaking } from "@/lib/voice";
 
-vi.mock("@/lib/voice", () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
+vi.mock("@/lib/voice", () => ({ speak: vi.fn(), stopSpeaking: vi.fn(), preloadVoice: vi.fn() }));
 
 const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 

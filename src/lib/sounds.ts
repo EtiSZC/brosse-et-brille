@@ -82,6 +82,64 @@ function playTone(frequency: number, duration: number, type: OscillatorType = 's
   osc.stop(c.currentTime + startTime + duration);
 }
 
+// ---------------------------------------------------------------------------
+// Pre-recorded clips (Brillou's voice), played on the same unlocked context
+// ---------------------------------------------------------------------------
+
+const clipCache = new Map<string, Promise<AudioBuffer | null>>();
+let currentClip: AudioBufferSourceNode | null = null;
+
+/** Fetch + decode a clip once; later calls reuse it. Resolves null on failure. */
+export function loadClip(url: string): Promise<AudioBuffer | null> {
+  const c = getCtx();
+  if (!c) return Promise.resolve(null);
+  let pending = clipCache.get(url);
+  if (!pending) {
+    pending = fetch(url)
+      .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(`${res.status}`))))
+      .then((data) => c.decodeAudioData(data))
+      .catch(() => {
+        clipCache.delete(url); // allow a retry later
+        return null;
+      });
+    clipCache.set(url, pending);
+  }
+  return pending;
+}
+
+export function stopClip() {
+  try {
+    currentClip?.stop();
+  } catch {
+    // already stopped
+  }
+  currentClip = null;
+}
+
+/**
+ * Play a clip, cutting off the previous one. `stillWanted` is checked once the
+ * clip is ready so a late load never speaks over a newer request.
+ * Resolves false if the clip couldn't be played (caller can fall back).
+ */
+export async function playClip(url: string, stillWanted: () => boolean = () => true): Promise<boolean> {
+  if (muted) return true;
+  const c = getCtx();
+  if (!c) return false;
+  const buffer = await loadClip(url);
+  if (!buffer) return false;
+  if (!stillWanted() || muted) return true;
+  stopClip();
+  const source = c.createBufferSource();
+  source.buffer = buffer;
+  source.connect(c.destination);
+  source.onended = () => {
+    if (currentClip === source) currentClip = null;
+  };
+  source.start();
+  currentClip = source;
+  return true;
+}
+
 /** Tone whose pitch slides from `from` to `to` Hz — bubble-like when short. */
 function playSweep(from: number, to: number, duration: number, startTime = 0, volume = 0.18) {
   if (muted) return;
