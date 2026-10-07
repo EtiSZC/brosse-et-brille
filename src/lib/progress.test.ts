@@ -13,12 +13,23 @@ describe("progress", () => {
     expect(slotOf(at(7, 19))).toBe("evening");
   });
 
-  it("awards one sticker per new slot, in collection order", () => {
-    const first = recordSession(at(7, 7));
-    expect(first).toMatchObject({ slot: "morning", newSticker: STICKERS[0] });
-    const second = recordSession(at(7, 20));
-    expect(second.newSticker).toEqual(STICKERS[1]);
-    expect(getProfile().stickers).toEqual([STICKERS[0].id, STICKERS[1].id]);
+  it("awards one random, not-yet-earned sticker per new slot", () => {
+    const first = recordSession(at(7, 7), undefined, () => 0.99); // last of the 20
+    expect(first).toMatchObject({ slot: "morning", newSticker: STICKERS[19] });
+    const second = recordSession(at(7, 20), undefined, () => 0); // first of the remaining 19
+    expect(second.newSticker).toEqual(STICKERS[0]);
+    expect(getProfile().stickers).toEqual([STICKERS[19].id, STICKERS[0].id]);
+  });
+
+  it("never gives the same sticker twice, and stops once the album is complete", () => {
+    for (let day = 1; day <= 10; day++) {
+      recordSession(at(day, 8));
+      recordSession(at(day, 20));
+    }
+    const earned = getProfile().stickers;
+    expect(earned).toHaveLength(20);
+    expect(new Set(earned).size).toBe(20);
+    expect(recordSession(at(11, 8)).newSticker).toBeNull();
   });
 
   it("counts brushing twice in the same slot only once (no extra sticker)", () => {
@@ -50,6 +61,6 @@ describe("progress", () => {
 
   it("survives corrupted storage", () => {
     localStorage.setItem("brosse-brille:progress:v1", "{not json");
-    expect(recordSession(at(7, 7)).newSticker).toEqual(STICKERS[0]);
+    expect(recordSession(at(7, 7), undefined, () => 0).newSticker).toEqual(STICKERS[0]);
   });
 });

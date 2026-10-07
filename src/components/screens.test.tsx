@@ -35,9 +35,9 @@ describe("retention screens", () => {
   });
 
   it("album: names earned stickers and counts them", () => {
-    recordSession(new Date(2026, 9, 7, 8));
+    const { newSticker } = recordSession(new Date(2026, 9, 7, 8)); // random draw
     render(<StickerAlbum onBack={() => {}} />);
-    expect(screen.getByText(STICKERS[0].name)).toBeInTheDocument();
+    expect(screen.getByText(newSticker!.name)).toBeInTheDocument();
     expect(screen.getByText("1/20")).toBeInTheDocument();
   });
 });

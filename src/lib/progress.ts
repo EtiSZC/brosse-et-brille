@@ -24,7 +24,7 @@ interface ProgressData {
 const STORAGE_KEY = "brosse-brille:progress:v1";
 export const DEFAULT_PROFILE = "default";
 
-/** The collection, earned in this order (one per new morning/evening slot). Never germ-themed. */
+/** The collection: one random not-yet-earned sticker per new morning/evening slot. Never germ-themed. */
 export const STICKERS = [
   { id: "unicorn", emoji: "🦄", name: "Licorne" },
   { id: "rocket", emoji: "🚀", name: "Fusée" },
@@ -106,8 +106,11 @@ export interface SessionResult {
   streak: number;
 }
 
-/** Record a completed 3-minute session. Brushing twice in the same slot counts once. */
-export function recordSession(now = new Date(), profile = DEFAULT_PROFILE): SessionResult {
+/**
+ * Record a completed 3-minute session. Brushing twice in the same slot counts once.
+ * The sticker is drawn at random among those not earned yet (`random` is injectable for tests).
+ */
+export function recordSession(now = new Date(), profile = DEFAULT_PROFILE, random = Math.random): SessionResult {
   const data = loadProgress();
   const p = getProfile(profile, data);
   const session: Session = { date: toDay(now), slot: slotOf(now) };
@@ -116,7 +119,8 @@ export function recordSession(now = new Date(), profile = DEFAULT_PROFILE): Sess
   let newSticker: Sticker | null = null;
   if (!alreadyFilled) {
     p.sessions.push(session);
-    newSticker = STICKERS.find((s) => !p.stickers.includes(s.id)) ?? null;
+    const remaining = STICKERS.filter((s) => !p.stickers.includes(s.id));
+    newSticker = remaining.length ? remaining[Math.floor(random() * remaining.length)] : null;
     if (newSticker) p.stickers.push(newSticker.id);
   }
   data.profiles[profile] = p;
