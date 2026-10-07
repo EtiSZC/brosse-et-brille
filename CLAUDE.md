@@ -107,6 +107,6 @@ npm run android    # rebuild + reinstall on the phone
    - **Molars visible**: 3 molars per side in the front view (wider cavity); molar steps zoom ~1.9× on that side, then card-flip to a top-down view of the molars; mini-map of the mouth in a corner.
    - **No tongue step** (tongue drawn as neutral anatomy only).
    - **8 steps / 180 s**, same order per arch: Devant 22 s → Derrière (front + molars, inner side) 22 s → Fond gauche 23 s (cheek side 11 s, then top 12 s) → Fond droite 23 s; upper then lower. BubbleTimer: 8 bubbles in 2 groups of 4.
-3. ✅ **Guidance** (done 2026-10-07, branch `phase-3-guidance`; awaiting phone test) — Brillou speaks each instruction (native TTS on Android), stops on pause and repeats on resume, "Bravo" at the end; 3-2-1 badge + tick before each step/view change; pulsing side arrow for back-teeth steps (words kept in the bubble for parents).
+3. ✅ **Guidance** (done 2026-10-07, merged; voice = pre-recorded ElevenLabs Lily clips) — Brillou speaks each instruction (native TTS on Android), stops on pause and repeats on resume, "Bravo" at the end; 3-2-1 badge + tick before each step/view change; pulsing side arrow for back-teeth steps (words kept in the bubble for parents).
 4. **Retention** — sun/moon weekly calendar (localStorage, per-profile data model); sticker album (not germ-themed); forgiving streaks; end CTA "À ce soir !" instead of "Recommencer".
 5. **Later** — Brillou poses (needs illustration), child profiles, gated parent corner, optional local reminders, music mode, signed release build for Google Play.
