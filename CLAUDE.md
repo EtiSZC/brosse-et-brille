@@ -68,11 +68,12 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 | Tag | State |
 |---|---|
 | `v0.2-phone-test` | Phase 1 + Phase 2 (front-view mouth with germs, 9 zones incl. tongue, bubble timer, candy bathroom) + Android app (Capacitor, bundled fonts, Brillou icon). The version tested on the Galaxy A55 on 2026-10-07. |
+| `v0.3-spotlight` | Phase 2b on top of v0.2: 8 steps (no tongue), spotlight + corner frame, brush travelling across every target tooth, matte → shiny teeth (no germs), 3 molars per side with zoomed cheek-side view and top-down chewing view, mini-map, 8-bubble timer. Installed on the Galaxy A55 on 2026-10-07. Last version before Phase 3 (voice guidance). |
 
 To go back to a restore point:
 
 ```bash
-git switch -c restore-v0.2 v0.2-phone-test   # new branch from the tag (keeps main untouched)
+git switch -c restore-v0.3 v0.3-spotlight     # new branch from a tag (keeps main untouched); or v0.2-phone-test
 npm install
 npm run dev        # web
 npm run android    # rebuild + reinstall on the phone
@@ -82,7 +83,7 @@ npm run android    # rebuild + reinstall on the phone
 
 1. ✅ **Foundations** (done 2026-10-06) — pause button + confirm to quit; Wake Lock; timestamp-based timer; single shared `AudioContext` unlocked on the start tap + mute toggle; contrast, reduced motion, zoom; fix canine bug.
 2. ✅ **Visual overhaul** (done 2026-10-06, tag `v0.2-phone-test`) — front-facing "big smile" mouth (card-flip for inner surfaces); germs that pop + teeth that sparkle; 9-bubble visual timer (small mm:ss for parents); "candy bathroom" art direction (mint `#3CCFB4`, bubblegum `#FF7EB6`, sunshine `#FFD23F`, ink `#1E2A4A`); chunky 3D buttons; zone tints (upper blue / lower peach / tongue pink).
-2b. ✅ **Phone-test feedback** (validated 2026-10-07, implemented on branch `phase-2b-feedback`; awaiting phone test):
+2b. ✅ **Phone-test feedback** (done 2026-10-07, tag `v0.3-spotlight`):
    - **No germs.** Teeth go from matte cream `#F2EBDD` to shiny white + glint as the brush passes; sparkle wave over the whole mouth at the end.
    - **Spotlight** on target teeth: ink veil ~30% with a window around them, other teeth at 55% opacity, target bright white + solid 4px mint outline + glow, sunshine `#FFD23F` 4-corner frame, one-time "boing"; window slides between steps; no pulsing.
    - **Brush covers the whole zone**: travels across every target tooth (ping-pong) with the gesture on top — circles (front), flicks gum→tip (inner), scrub (molar cheek side), flat slide (molar tops).
