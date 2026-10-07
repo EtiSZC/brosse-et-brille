@@ -14,6 +14,7 @@
     "android": "npm run build && npx cap sync android && cd android && JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ./gradlew assembleDebug -q && adb install -r app/build/outputs/apk/debug/app-debug.apk && adb shell monkey -p com.etiszc.brosseetbrille -c android.intent.category.LAUNCHER 1"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "^8.0.2",
     "@capacitor/android": "^8.5.2",
     "@capacitor/core": "^8.5.2",
     "@fontsource/fredoka": "^5.3.0",

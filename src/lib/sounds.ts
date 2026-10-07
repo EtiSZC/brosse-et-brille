@@ -108,6 +108,11 @@ export function playPop() {
   playSweep(600, 900, 0.09);
 }
 
+export function playTick() {
+  // Soft woodblock-like tick for the 3-2-1 countdown
+  playSweep(1100, 900, 0.06, 0, 0.12);
+}
+
 export function playFanfare() {
   // A cheerful ascending fanfare
   const notes = [

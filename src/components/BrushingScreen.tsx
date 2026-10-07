@@ -6,10 +6,14 @@ import BathroomBackground from "./BathroomBackground";
 import BubbleTimer from "./BubbleTimer";
 import MouthDiagram from "./mouth/MouthDiagram";
 import MiniMap from "./mouth/MiniMap";
+import { stepInfo } from "./mouth/geometry";
+import Countdown from "./Countdown";
+import SideMarker from "./SideMarker";
 import MuteButton from "./MuteButton";
 import SpeechBubble from "./SpeechBubble";
 import { Button } from "@/components/ui/button";
-import { playPop, playZoneComplete, unlockAudio } from "@/lib/sounds";
+import { playPop, playTick, playZoneComplete, unlockAudio } from "@/lib/sounds";
+import { speak, stopSpeaking } from "@/lib/voice";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 
 interface BrushingScreenProps {
@@ -86,6 +90,29 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
     prevPhaseRef.current = phaseIndex;
   }, [currentZoneIndex, phaseIndex]);
 
+  // Brillou says each instruction when its step/view starts (just after the chime),
+  // and "Bravo" at the end. Pausing cuts him off; resuming repeats the instruction.
+  const instruction = finished ? "Bravo, tout brille\u00A0!" : currentPhase.instruction;
+  useEffect(() => {
+    if (paused) {
+      stopSpeaking();
+      return;
+    }
+    const id = setTimeout(() => speak(instruction), 400);
+    return () => clearTimeout(id);
+  }, [instruction, paused]);
+  useEffect(() => () => stopSpeaking(), []);
+
+  // 3-2-1 before every change of step or view, with a soft tick on each number.
+  const secondsLeftInPhase = currentPhase.durationSeconds - phaseElapsed;
+  const countdown =
+    !finished && !paused && secondsLeftInPhase > 0 && secondsLeftInPhase <= 3 ? Math.ceil(secondsLeftInPhase) : null;
+  useEffect(() => {
+    if (countdown !== null) playTick();
+  }, [countdown]);
+
+  const { side } = stepInfo({ zoneIndex: currentZoneIndex, phaseIndex });
+
   const handleResume = () => {
     unlockAudio(); // the context may have been suspended while in background
     setPaused(false);
@@ -136,6 +163,8 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
           {!finished && (
             <MiniMap step={{ zoneIndex: currentZoneIndex, phaseIndex }} className="absolute top-0 right-0" />
           )}
+          {!finished && side !== "front" && <SideMarker key={side} side={side} />}
+          <Countdown value={countdown} />
         </div>
 
         {/* Brillou explains the current zone */}
@@ -152,7 +181,7 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
             >
               <SpeechBubble>
                 <p className="font-display font-semibold text-xl sm:text-2xl leading-snug text-ink">
-                  {finished ? "Bravo, tout brille !" : currentPhase.instruction}
+                  {instruction}
                 </p>
               </SpeechBubble>
             </motion.div>

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import BrushingScreen from "./BrushingScreen";
+import { speak, stopSpeaking } from "@/lib/voice";
+
+vi.mock("@/lib/voice", () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
 
 const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
@@ -10,7 +13,11 @@ const setVisibility = (state: DocumentVisibilityState) => {
 };
 
 describe("BrushingScreen", () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.mocked(speak).mockClear();
+    vi.mocked(stopSpeaking).mockClear();
+  });
   afterEach(() => {
     vi.useRealTimers();
     setVisibility("visible");
@@ -73,5 +80,35 @@ describe("BrushingScreen", () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
     advance(10000);
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("has Brillou say the instruction, stop on pause and repeat it on resume", () => {
+    render(<BrushingScreen onComplete={() => {}} onCancel={() => {}} />);
+    advance(500);
+    expect(speak).toHaveBeenCalledWith("Brosse le devant des dents du haut\u00A0!");
+
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(stopSpeaking).toHaveBeenCalled();
+
+    vi.mocked(speak).mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Continuer/ }));
+    advance(500);
+    expect(speak).toHaveBeenCalledWith("Brosse le devant des dents du haut\u00A0!");
+  });
+
+  it("counts down 3-2-1 before the next step", () => {
+    render(<BrushingScreen onComplete={() => {}} onCancel={() => {}} />);
+    advance(18000);
+    expect(screen.queryByTestId("countdown")).not.toBeInTheDocument();
+    advance(1250); // 19.25 s: 2.75 s left in step 1 (22 s)
+    expect(screen.getByTestId("countdown")).toHaveTextContent("3");
+  });
+
+  it("shows the side marker only for back-teeth steps, on the right side", () => {
+    render(<BrushingScreen onComplete={() => {}} onCancel={() => {}} />);
+    advance(5000);
+    expect(screen.queryByTestId(/side-marker/)).not.toBeInTheDocument();
+    advance(41000); // 46 s: upper-left back teeth
+    expect(screen.getByTestId("side-marker-left")).toBeInTheDocument();
   });
 });

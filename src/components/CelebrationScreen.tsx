@@ -5,6 +5,7 @@ import mascotCelebrateImg from "@/assets/mascot-celebrate.png";
 import { Button } from "@/components/ui/button";
 import BathroomBackground from "@/components/BathroomBackground";
 import { playFanfare, playStarSound } from "@/lib/sounds";
+import { speak, stopSpeaking } from "@/lib/voice";
 
 interface CelebrationScreenProps {
   onRestart: () => void;
@@ -12,6 +13,7 @@ interface CelebrationScreenProps {
 
 const CelebrationScreen = ({ onRestart }: CelebrationScreenProps) => {
   const hasPlayed = useRef(false);
+  const speakTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (hasPlayed.current) return;
@@ -21,6 +23,7 @@ const CelebrationScreen = ({ onRestart }: CelebrationScreenProps) => {
     playFanfare();
     setTimeout(() => playStarSound(), 800);
     setTimeout(() => playStarSound(), 1200);
+    speakTimer.current = setTimeout(() => speak("Bravo\u00A0! Tes dents sont toutes propres et brillantes\u00A0!"), 1500);
 
     // Confetti bursts
     const fire = (opts: confetti.Options) => {
@@ -41,6 +44,13 @@ const CelebrationScreen = ({ onRestart }: CelebrationScreenProps) => {
       fire({ angle: 90, origin: { x: 0.5, y: 0.8 }, particleCount: 120, spread: 100 });
     }, 600);
   }, []);
+  useEffect(
+    () => () => {
+      clearTimeout(speakTimer.current); // leaving early: don't talk over the next screen
+      stopSpeaking();
+    },
+    [],
+  );
 
   return (
     <BathroomBackground tint="hsl(46 100% 80% / 0.45)">
