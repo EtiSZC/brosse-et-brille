@@ -86,11 +86,12 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 |---|---|
 | `v0.2-phone-test` | Phase 1 + Phase 2 (front-view mouth with germs, 9 zones incl. tongue, bubble timer, candy bathroom) + Android app (Capacitor, bundled fonts, Brillou icon). The version tested on the Galaxy A55 on 2026-10-07. |
 | `v0.3-spotlight` | Phase 2b on top of v0.2: 8 steps (no tongue), spotlight + corner frame, brush travelling across every target tooth, matte → shiny teeth (no germs), 3 molars per side with zoomed cheek-side view and top-down chewing view, mini-map, 8-bubble timer. Installed on the Galaxy A55 on 2026-10-07. Last version before Phase 3 (voice guidance). |
+| `v0.4-voice` | Phase 3 on top of v0.3: Brillou speaks every instruction with pre-recorded ElevenLabs clips (voice Lily, device TTS fallback), 3-2-1 countdown badge + tick, side arrows for back-teeth steps. Validated on the Galaxy A55 on 2026-10-07. Last version before Phase 4 (calendar, stickers, streaks). |
 
 To go back to a restore point:
 
 ```bash
-git switch -c restore-v0.3 v0.3-spotlight     # new branch from a tag (keeps main untouched); or v0.2-phone-test
+git switch -c restore-v0.4 v0.4-voice         # new branch from a tag (keeps main untouched); or v0.3-spotlight, v0.2-phone-test
 npm install
 npm run dev        # web
 npm run android    # rebuild + reinstall on the phone
@@ -107,6 +108,6 @@ npm run android    # rebuild + reinstall on the phone
    - **Molars visible**: 3 molars per side in the front view (wider cavity); molar steps zoom ~1.9× on that side, then card-flip to a top-down view of the molars; mini-map of the mouth in a corner.
    - **No tongue step** (tongue drawn as neutral anatomy only).
    - **8 steps / 180 s**, same order per arch: Devant 22 s → Derrière (front + molars, inner side) 22 s → Fond gauche 23 s (cheek side 11 s, then top 12 s) → Fond droite 23 s; upper then lower. BubbleTimer: 8 bubbles in 2 groups of 4.
-3. ✅ **Guidance** (done 2026-10-07, merged; voice = pre-recorded ElevenLabs Lily clips) — Brillou speaks each instruction (native TTS on Android), stops on pause and repeats on resume, "Bravo" at the end; 3-2-1 badge + tick before each step/view change; pulsing side arrow for back-teeth steps (words kept in the bubble for parents).
+3. ✅ **Guidance** (done 2026-10-07, merged; voice = pre-recorded ElevenLabs Lily clips) — Brillou speaks each instruction (pre-recorded Lily clips, device TTS fallback), stops on pause and repeats on resume, "Bravo" at the end; 3-2-1 badge + tick before each step/view change; pulsing side arrow for back-teeth steps (words kept in the bubble for parents).
 4. **Retention** — sun/moon weekly calendar (localStorage, per-profile data model); sticker album (not germ-themed); forgiving streaks; end CTA "À ce soir !" instead of "Recommencer".
 5. **Later** — Brillou poses (needs illustration), child profiles, gated parent corner, optional local reminders, music mode, signed release build for Google Play.
