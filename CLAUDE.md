@@ -42,7 +42,7 @@ Clips are generated once and bundled (offline, nothing sent at runtime). Voice *
 node scripts/generate-voice.mjs   # after editing any instruction / line; only new or changed sentences are generated
 ```
 
-- API key in `.env.local` (`ELEVENLABS_API_KEY`, git-ignored, never bundled — no `VITE_` prefix). The key lacks the "Voices: Read" permission.
+- API keys in `.env.local` (`ELEVENLABS_API_KEY` for TTS, `ELEVENLABS_MUSIC_API_KEY`; git-ignored, never bundled — no `VITE_` prefix). The Music API needs a paid plan (HTTP 402 on free), so the music mode is synthesized in code instead.
 - Account is on the **free plan** (10,000 chars/month; the 12 lines ≈ 500 chars). Free plan: only default voices via API, and **no commercial use** — upgrade and regenerate before publishing the app.
 - A test fails if a sentence in `VOICE_LINES` has no clip (forgot to run the script).
 - Write non-breaking spaces as `\u00A0` in code (French typography before "!"); a raw NBSP character fails lint (`no-irregular-whitespace`).
@@ -101,11 +101,12 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 | `v0.3-spotlight` | Phase 2b on top of v0.2: 8 steps (no tongue), spotlight + corner frame, brush travelling across every target tooth, matte → shiny teeth (no germs), 3 molars per side with zoomed cheek-side view and top-down chewing view, mini-map, 8-bubble timer. Installed on the Galaxy A55 on 2026-10-07. Last version before Phase 3 (voice guidance). |
 | `v0.4-voice` | Phase 3 on top of v0.3: Brillou speaks every instruction with pre-recorded ElevenLabs clips (voice Lily, device TTS fallback), 3-2-1 countdown badge + tick, side arrows for back-teeth steps. Validated on the Galaxy A55 on 2026-10-07. Last version before Phase 4 (calendar, stickers, streaks). |
 | `v0.5-stickers` | Phase 4 on top of v0.4: on-device history, sun/moon weekly calendar, forgiving streak, random stickers (20) + album, "À ce soir !" / "À demain !". Single child (one `default` profile). APK: `releases/brosse-et-brille-v0.5-debug.apk`. Validated on the Galaxy A55 on 2026-10-07. Last version before Phase 5 (child profiles). |
+| `v0.6-profiles` | Phase 5 on top of v0.5: up to 4 child profiles (name + animal emoji), "Qui se brosse les dents ?" picker, brushing together, parents screen behind a 2 s hold, per-child calendar/streak/album. APK: `releases/brosse-et-brille-v0.6-debug.apk`. Validated on the Galaxy A55 on 2026-10-07. Last version before the music mode. |
 
 To go back to a restore point:
 
 ```bash
-git switch -c restore-v0.5 v0.5-stickers      # new branch from a tag (keeps main untouched); or v0.4-voice, v0.3-spotlight, v0.2-phone-test
+git switch -c restore-v0.6 v0.6-profiles      # new branch from a tag (keeps main untouched); or v0.5-stickers, v0.4-voice, v0.3-spotlight, v0.2-phone-test
 npm install
 npm run dev        # web
 npm run android    # rebuild + reinstall on the phone
