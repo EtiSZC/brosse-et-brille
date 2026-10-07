@@ -96,11 +96,12 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 | `v0.2-phone-test` | Phase 1 + Phase 2 (front-view mouth with germs, 9 zones incl. tongue, bubble timer, candy bathroom) + Android app (Capacitor, bundled fonts, Brillou icon). The version tested on the Galaxy A55 on 2026-10-07. |
 | `v0.3-spotlight` | Phase 2b on top of v0.2: 8 steps (no tongue), spotlight + corner frame, brush travelling across every target tooth, matte → shiny teeth (no germs), 3 molars per side with zoomed cheek-side view and top-down chewing view, mini-map, 8-bubble timer. Installed on the Galaxy A55 on 2026-10-07. Last version before Phase 3 (voice guidance). |
 | `v0.4-voice` | Phase 3 on top of v0.3: Brillou speaks every instruction with pre-recorded ElevenLabs clips (voice Lily, device TTS fallback), 3-2-1 countdown badge + tick, side arrows for back-teeth steps. Validated on the Galaxy A55 on 2026-10-07. Last version before Phase 4 (calendar, stickers, streaks). |
+| `v0.5-stickers` | Phase 4 on top of v0.4: on-device history, sun/moon weekly calendar, forgiving streak, random stickers (20) + album, "À ce soir !" / "À demain !". Single child (one `default` profile). APK: `releases/brosse-et-brille-v0.5-debug.apk`. Validated on the Galaxy A55 on 2026-10-07. Last version before Phase 5 (child profiles). |
 
 To go back to a restore point:
 
 ```bash
-git switch -c restore-v0.4 v0.4-voice         # new branch from a tag (keeps main untouched); or v0.3-spotlight, v0.2-phone-test
+git switch -c restore-v0.5 v0.5-stickers      # new branch from a tag (keeps main untouched); or v0.4-voice, v0.3-spotlight, v0.2-phone-test
 npm install
 npm run dev        # web
 npm run android    # rebuild + reinstall on the phone
