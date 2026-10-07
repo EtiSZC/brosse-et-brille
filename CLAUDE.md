@@ -17,6 +17,16 @@ node scripts/screenshots.mjs [--quick]   # with dev server running: phone screen
 
 Don't use Playwright's fake clock (`page.clock`) for visual checks: it desyncs framer-motion's `AnimatePresence`, so zone changes and the pause overlay don't render. Unit tests use vitest fake timers and are fine. The start button "breathes", so Playwright must click it with `{ force: true }`.
 
+## Android app (Capacitor)
+
+`android/` is a Capacitor 8 native project (app id `com.etiszc.brosseetbrille`, portrait only) that packages `dist/` into an APK. Toolchain on this Mac: Java 21 (`brew openjdk@21`, keg-only) and the Android SDK at `/opt/homebrew/share/android-commandlinetools` (platform 36, build-tools 36). Target phone: Samsung Galaxy A55 (Android 16), connected over USB with debugging on.
+
+```bash
+npm run android   # build web → cap sync → gradle assembleDebug → adb install → launch
+```
+
+Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capacitor/assets generate --android --iconBackgroundColor '#DFF7F0' --splashBackgroundColor '#DFF7F0'`. Fonts are bundled via `@fontsource` (no network needed at runtime).
+
 ## Stack
 
 React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `toaster`, `sonner`, `tooltip` are kept — add others with `npx shadcn add <name>`), framer-motion, canvas-confetti, vite-plugin-pwa. No backend, no persistence yet. Path alias `@/` → `src/`.
@@ -52,10 +62,32 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - **Privacy**: no accounts, no tracking, no third-party SDKs; all data stays on device (COPPA / GDPR-K).
 - **No dark patterns**: no ads, currency, loot boxes, guilt ("Brillou est triste"), streak punishment, or extra screen time after brushing. No scoring of brushing quality.
 
+## Restore points (git tags)
+
+| Tag | State |
+|---|---|
+| `v0.2-phone-test` | Phase 1 + Phase 2 (front-view mouth with germs, 9 zones incl. tongue, bubble timer, candy bathroom) + Android app (Capacitor, bundled fonts, Brillou icon). The version tested on the Galaxy A55 on 2026-10-07. |
+
+To go back to a restore point:
+
+```bash
+git switch -c restore-v0.2 v0.2-phone-test   # new branch from the tag (keeps main untouched)
+npm install
+npm run dev        # web
+npm run android    # rebuild + reinstall on the phone
+```
+
 ## Roadmap (from design / PM / UX review)
 
-1. ✅ **Foundations** (done 2026-10-06) — pause button + long-press/confirm to quit; Wake Lock; timestamp-based timer; single shared `AudioContext` unlocked on the start tap + mute toggle; contrast, reduced motion, zoom; fix canine bug.
-2. ✅ **Visual overhaul** (done 2026-10-06, branch `phase-2-visual`) — front-facing "big smile" mouth (~70% width, card-flip for inner surfaces); germs that pop + teeth that shine; 9-bubble visual timer (small mm:ss for parents); "candy bathroom" art direction (mint `#3CCFB4`, bubblegum `#FF7EB6`, sunshine `#FFD23F`, ink `#1E2A4A`); chunky 3D buttons; calmer zone colours (upper blue / lower peach / tongue pink).
-3. **Guidance** — Brillou voice lines per zone (fr-FR `speechSynthesis` fallback); 3-2-1 warning before zone change; side markers instead of "gauche/droite".
-4. **Retention** — sun/moon weekly calendar (localStorage, per-profile data model); sticker album; forgiving streaks; end CTA "À ce soir !" instead of "Recommencer".
-5. **Later** — Brillou poses (needs illustration), child profiles, gated parent corner, optional local reminders, music mode.
+1. ✅ **Foundations** (done 2026-10-06) — pause button + confirm to quit; Wake Lock; timestamp-based timer; single shared `AudioContext` unlocked on the start tap + mute toggle; contrast, reduced motion, zoom; fix canine bug.
+2. ✅ **Visual overhaul** (done 2026-10-06, tag `v0.2-phone-test`) — front-facing "big smile" mouth (card-flip for inner surfaces); germs that pop + teeth that sparkle; 9-bubble visual timer (small mm:ss for parents); "candy bathroom" art direction (mint `#3CCFB4`, bubblegum `#FF7EB6`, sunshine `#FFD23F`, ink `#1E2A4A`); chunky 3D buttons; zone tints (upper blue / lower peach / tongue pink).
+2b. **Phone-test feedback** (validated by the user 2026-10-07, branch `phase-2b-feedback`):
+   - **No germs.** Teeth go from matte cream `#F2EBDD` to shiny white + glint as the brush passes; sparkle wave over the whole mouth at the end.
+   - **Spotlight** on target teeth: ink veil ~30% with a window around them, other teeth at 55% opacity, target bright white + solid 4px mint outline + glow, sunshine `#FFD23F` 4-corner frame, one-time "boing"; window slides between steps; no pulsing.
+   - **Brush covers the whole zone**: travels across every target tooth (ping-pong) with the gesture on top — circles (front), flicks gum→tip (inner), scrub (molar cheek side), flat slide (molar tops).
+   - **Molars visible**: 3 molars per side in the front view (wider cavity); molar steps zoom ~1.9× on that side, then card-flip to a top-down view of the molars; mini-map of the mouth in a corner.
+   - **No tongue step** (tongue drawn as neutral anatomy only).
+   - **8 steps / 180 s**, same order per arch: Devant 22 s → Derrière (front + molars, inner side) 22 s → Fond gauche 23 s (cheek side 11 s, then top 12 s) → Fond droite 23 s; upper then lower. BubbleTimer: 8 bubbles in 2 groups of 4.
+3. **Guidance** — Brillou voice lines per step (fr-FR `speechSynthesis` fallback); 3-2-1 warning before zone change; side markers instead of "gauche/droite". Do after 2b.
+4. **Retention** — sun/moon weekly calendar (localStorage, per-profile data model); sticker album (not germ-themed); forgiving streaks; end CTA "À ce soir !" instead of "Recommencer".
+5. **Later** — Brillou poses (needs illustration), child profiles, gated parent corner, optional local reminders, music mode, signed release build for Google Play.
