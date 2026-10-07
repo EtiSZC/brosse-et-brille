@@ -1,7 +1,7 @@
 // Phone-sized screenshots of key app states, using the local Chrome install.
 // Usage: start the dev server (npm run dev), then: node scripts/screenshots.mjs [--quick]
 // Runs in real time: Playwright's fake clock desyncs framer-motion's AnimatePresence,
-// so zone transitions would not render. Full run ≈ 3 min 10 s; --quick stops after zone 2.
+// so zone transitions would not render. Full run ≈ 3 min 10 s; --quick stops after the first back-teeth step (≈ 65 s).
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 
@@ -12,15 +12,17 @@ mkdirSync(OUT, { recursive: true });
 
 // Seconds after "C'est parti" → file name (a few seconds into each zone).
 const ZONE_SHOTS = [
-  [8, "zone1-devant-haut"],
-  [30, "zone2-derriere-haut"],
-  [52, "zone3-molaires-haut-gauche"],
-  [72, "zone4-molaires-haut-droite"],
-  [94, "zone5-devant-bas"],
-  [116, "zone6-derriere-bas"],
-  [138, "zone7-molaires-bas-gauche"],
-  [158, "zone8-molaires-bas-droite"],
-  [174, "zone9-langue"],
+  [6, "1-devant-haut"],
+  [30, "2-derriere-haut"],
+  [50, "3a-fond-haut-gauche-joue"],
+  [61, "3b-fond-haut-gauche-dessus"],
+  [74, "4a-fond-haut-droite-joue"],
+  [96, "5-devant-bas"],
+  [120, "6-derriere-bas"],
+  [140, "7a-fond-bas-gauche-joue"],
+  [151, "7b-fond-bas-gauche-dessus"],
+  [174, "8b-fond-bas-droite-dessus"],
+  [180.9, "9-tout-brille"],
 ];
 
 const browser = await chromium.launch({ channel: "chrome" });
@@ -36,9 +38,9 @@ const startedAt = Date.now();
 const waitUntil = (s) => page.waitForTimeout(Math.max(0, startedAt + s * 1000 - Date.now()));
 
 for (const [i, [at, name]] of ZONE_SHOTS.entries()) {
-  if (QUICK && i > 1) break;
+  if (QUICK && i > 3) break;
   await waitUntil(at);
-  await shot(`${i + 1}-${name}`);
+  await shot(name);
 }
 
 if (QUICK) {

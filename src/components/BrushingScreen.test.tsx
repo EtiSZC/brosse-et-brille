@@ -59,12 +59,19 @@ describe("BrushingScreen", () => {
     expect(screen.getByText("2:57")).toBeInTheDocument();
   });
 
-  it("completes exactly once after 3 minutes", () => {
+  it("shows the 'everything shines' moment at 3:00, then completes exactly once", () => {
     const onComplete = vi.fn();
     render(<BrushingScreen onComplete={onComplete} onCancel={() => {}} />);
     advance(179000);
     expect(onComplete).not.toHaveBeenCalled();
-    advance(5000);
+    advance(1000);
+    // (Checked via the mouth's label: the speech bubble swaps with an exit
+    // animation that framer-motion doesn't complete under fake timers.)
+    expect(screen.getByRole("img", { name: "Toutes les dents brillent" })).toBeInTheDocument();
+    expect(onComplete).not.toHaveBeenCalled();
+    advance(2000);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    advance(10000);
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });

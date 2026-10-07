@@ -1,63 +1,74 @@
-import { BRUSHING_ZONES, type ToothRegion } from "@/data/brushingZones";
+import { BRUSHING_ZONES, type MouthView } from "@/data/brushingZones";
 
 /**
- * Front-facing "big smile" mouth, drawn on a 320x260 canvas.
+ * Mouth drawings on a 320x260 canvas:
+ * - "smile": front-facing open mouth (front, inside and zoomed molar-side views)
+ * - "arch": top-down view of one arch (chewing surfaces)
  * Mirror convention: the phone faces the child like a mirror, so screen-left is
- * the child's left ("upper-left" teeth are drawn on the left of the screen).
+ * the child's left ("left" teeth are drawn on the left of the screen).
  */
 
 export const VIEW_W = 320;
 export const VIEW_H = 260;
 const CX = VIEW_W / 2;
+export const FULL_VIEWBOX = `0 0 ${VIEW_W} ${VIEW_H}`;
 
-export const LIPS_PATH = "M20,80 C60,28 260,28 300,80 C302,190 232,252 160,252 C88,252 18,190 20,80 Z";
-export const CAVITY_PATH = "M36,88 C74,50 246,50 284,88 C284,182 222,236 160,236 C98,236 36,182 36,88 Z";
+export type Arch = "upper" | "lower";
+export type Side = "left" | "front" | "right";
 
+export const LIPS_PATH = "M8,80 C52,24 268,24 312,80 C314,192 238,254 160,254 C82,254 6,192 8,80 Z";
+export const CAVITY_PATH = "M24,88 C66,48 254,48 296,88 C296,184 228,238 160,238 C92,238 24,184 24,88 Z";
 export const TONGUE = { cx: CX, cy: 170, rx: 72, ry: 36 };
 
 /** Gum line of the upper teeth (teeth hang down from it). */
-export const upperGumY = (x: number) => 84 + 0.0016 * (x - CX) ** 2;
+export const upperGumY = (x: number) => 82 + 0.0015 * (x - CX) ** 2;
 /** Gum line of the lower teeth (teeth stand up from it). */
-export const lowerGumY = (x: number) => 214 - 0.0022 * (x - CX) ** 2;
+export const lowerGumY = (x: number) => 214 - 0.0017 * (x - CX) ** 2;
 
-type Side = "left" | "front" | "right";
-const SIDES: Side[] = ["left", "left", "front", "front", "front", "front", "right", "right"];
-
-const UPPER_WIDTHS = [26, 28, 30, 34, 34, 30, 28, 26];
-const UPPER_HEIGHTS = [26, 30, 34, 40, 40, 34, 30, 26];
-const LOWER_WIDTHS = [21, 23, 25, 28, 28, 25, 23, 21];
-const LOWER_HEIGHTS = [22, 24, 26, 30, 30, 26, 24, 22];
+// 3 molars, 4 front teeth, 3 molars — left to right on screen.
+const SIDES: Side[] = ["left", "left", "left", "front", "front", "front", "front", "right", "right", "right"];
+const UPPER_WIDTHS = [20, 23, 26, 29, 33, 33, 29, 26, 23, 20];
+const UPPER_HEIGHTS = [22, 24, 26, 31, 38, 38, 31, 26, 24, 22];
+const LOWER_WIDTHS = [15, 18, 20, 22, 25, 25, 22, 20, 18, 15];
+const LOWER_HEIGHTS = [18, 20, 22, 25, 28, 28, 25, 22, 20, 18];
 
 export interface Tooth {
-  region: ToothRegion;
-  arch: "upper" | "lower";
+  /** 0..9, left to right on screen (same index in the smile and arch views). */
+  index: number;
+  arch: Arch;
+  side: Side;
+  molar: boolean;
   d: string;
-  /** Centre of the visible crown. */
+  x0: number;
+  x1: number;
   cx: number;
   cy: number;
   /** Biting edge (tip) y and gum-side y. */
   tipY: number;
   gumY: number;
-  width: number;
 }
 
-/** Rounded-tip tooth; extends 10px into the gum so the gum can overlap it cleanly. */
-function toothPath(x0: number, x1: number, gumY: number, tipY: number): string {
-  const r = Math.min(9, (x1 - x0) / 2.6);
+/** Rounded tooth that extends 10px into the gum; molars get two small cusps. */
+function toothPath(x0: number, x1: number, gumY: number, tipY: number, molar: boolean): string {
+  const r = Math.min(8, (x1 - x0) / 2.8);
   const dir = tipY > gumY ? 1 : -1; // 1 = hangs down (upper), -1 = stands up (lower)
   const root = gumY - 10 * dir;
+  const mid = (x0 + x1) / 2;
+  const edge = molar
+    ? `Q${mid - (x1 - x0) / 4},${tipY + 2 * dir} ${mid},${tipY - 2 * dir} Q${mid + (x1 - x0) / 4},${tipY + 2 * dir} ${x1 - r},${tipY}`
+    : `L${x1 - r},${tipY}`;
   return [
     `M${x0},${root}`,
     `L${x0},${tipY - r * dir}`,
     `Q${x0},${tipY} ${x0 + r},${tipY}`,
-    `L${x1 - r},${tipY}`,
+    edge,
     `Q${x1},${tipY} ${x1},${tipY - r * dir}`,
     `L${x1},${root}`,
     "Z",
   ].join(" ");
 }
 
-function buildArch(arch: "upper" | "lower"): Tooth[] {
+function buildArch(arch: Arch): Tooth[] {
   const widths = arch === "upper" ? UPPER_WIDTHS : LOWER_WIDTHS;
   const heights = arch === "upper" ? UPPER_HEIGHTS : LOWER_HEIGHTS;
   const total = widths.reduce((a, b) => a + b, 0);
@@ -69,22 +80,15 @@ function buildArch(arch: "upper" | "lower"): Tooth[] {
     const cx = (x0 + x1) / 2;
     const gumY = arch === "upper" ? upperGumY(cx) : lowerGumY(cx);
     const tipY = arch === "upper" ? gumY + heights[i] : gumY - heights[i];
-    return {
-      region: `${arch}-${SIDES[i]}` as ToothRegion,
-      arch,
-      d: toothPath(x0, x1, gumY, tipY),
-      cx,
-      cy: (gumY + tipY) / 2,
-      tipY,
-      gumY,
-      width: w,
-    };
+    const molar = SIDES[i] !== "front";
+    return { index: i, arch, side: SIDES[i], molar, d: toothPath(x0, x1, gumY, tipY, molar), x0, x1, cx, cy: (gumY + tipY) / 2, tipY, gumY };
   });
 }
 
 export const UPPER_TEETH = buildArch("upper");
 export const LOWER_TEETH = buildArch("lower");
 export const ALL_TEETH = [...UPPER_TEETH, ...LOWER_TEETH];
+export const teethOfArch = (arch: Arch) => (arch === "upper" ? UPPER_TEETH : LOWER_TEETH);
 
 /** Gum shapes: everything above/below the gum line, clipped to the cavity when drawn. */
 function gumPolygon(gumY: (x: number) => number, edgeY: number): string {
@@ -95,157 +99,243 @@ function gumPolygon(gumY: (x: number) => number, edgeY: number): string {
 export const UPPER_GUM_PATH = gumPolygon(upperGumY, 0);
 export const LOWER_GUM_PATH = gumPolygon(lowerGumY, VIEW_H);
 
-const teethOf = (region: ToothRegion) => ALL_TEETH.filter((t) => t.region === region);
-const average = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
-
-/** "back" zones = inner (tongue-side) surface of the front teeth. */
-export const INNER_SIDE_OF: Partial<Record<ToothRegion, ToothRegion>> = {
-  "upper-back": "upper-front",
-  "lower-back": "lower-front",
-};
-
-/** Light "inside of the mouth" patch drawn behind see-through front teeth. */
-export function palatePatch(region: ToothRegion): { x: number; y: number; w: number; h: number } | null {
-  const inner = INNER_SIDE_OF[region];
-  if (!inner) return null;
-  const front = teethOf(inner);
-  const x0 = Math.min(...front.map((t) => t.cx - t.width / 2)) - 4;
-  const x1 = Math.max(...front.map((t) => t.cx + t.width / 2)) + 4;
-  const ys = front.flatMap((t) => [t.gumY, t.tipY]);
-  const y0 = Math.min(...ys) - 6;
-  const y1 = Math.max(...ys) + 6;
-  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-}
-
-export const isInnerRegion = (region: ToothRegion | undefined) => !!region && region in INNER_SIDE_OF;
-
 // ---------------------------------------------------------------------------
-// Germs
+// Top-down arch view (chewing surfaces)
 // ---------------------------------------------------------------------------
 
-export interface Germ {
-  zoneIndex: number;
-  /** Order in which germs of a zone pop. */
-  indexInZone: number;
-  countInZone: number;
-  x: number;
-  y: number;
-  r: number;
-  /** "back" germs sit behind the teeth (inner surfaces), visible when teeth go see-through. */
-  layer: "front" | "back";
+export const ARCH_ELLIPSE = { cx: CX, cy: 225, rx: 110, ry: 175 };
+/** Angle (degrees) of each tooth on the half-ellipse: back-left molar → back-right molar. */
+const ARCH_ANGLES = [172, 156, 140, 122, 101, 79, 58, 40, 24, 8];
+const ARCH_SIZES = [34, 32, 30, 22, 26, 26, 22, 30, 32, 34];
+
+export interface ArchTooth {
+  index: number;
+  side: Side;
+  molar: boolean;
+  cx: number;
+  cy: number;
+  /** Rotation (degrees) following the curve of the arch. */
+  rotate: number;
+  size: number;
 }
 
-function germSpotsForZone(region: ToothRegion): Omit<Germ, "zoneIndex" | "indexInZone" | "countInZone">[] {
-  if (region === "tongue") {
-    return [
-      { x: TONGUE.cx - 30, y: TONGUE.cy - 14, r: 8, layer: "front" },
-      { x: TONGUE.cx, y: TONGUE.cy - 24, r: 8, layer: "front" },
-      { x: TONGUE.cx + 30, y: TONGUE.cy - 14, r: 8, layer: "front" },
-    ];
-  }
-  const inner = INNER_SIDE_OF[region];
-  if (inner) {
-    // Peek out between the gum and the biting edge of the front teeth.
-    return teethOf(inner).map((t) => ({
-      x: t.cx,
-      y: t.arch === "upper" ? t.gumY + 10 : t.gumY - 10,
-      r: 7,
-      layer: "back" as const,
-    }));
-  }
-  return teethOf(region).map((t) => ({
-    x: t.cx,
-    y: t.cy + (t.arch === "upper" ? 3 : -3),
-    r: t.width > 28 ? 8 : 6.5,
-    layer: "front" as const,
-  }));
-}
-
-export const GERMS: Germ[] = BRUSHING_ZONES.flatMap((zone, zoneIndex) => {
-  const spots = germSpotsForZone(zone.highlight[0]);
-  return spots.map((spot, indexInZone) => ({
-    ...spot,
-    zoneIndex,
-    indexInZone,
-    countInZone: spots.length,
-  }));
+export const ARCH_TEETH: ArchTooth[] = ARCH_ANGLES.map((deg, i) => {
+  const a = (deg * Math.PI) / 180;
+  return {
+    index: i,
+    side: SIDES[i],
+    molar: SIDES[i] !== "front",
+    cx: ARCH_ELLIPSE.cx + ARCH_ELLIPSE.rx * Math.cos(a),
+    cy: ARCH_ELLIPSE.cy - ARCH_ELLIPSE.ry * Math.sin(a),
+    rotate: 90 - deg,
+    size: ARCH_SIZES[i],
+  };
 });
 
-/**
- * Future zones keep all their germs, past zones are clean, and in the current
- * zone germ k of n pops once the zone is (k+1)/(n+1) done.
- */
-export function isGermVisible(germ: Germ, currentZoneIndex: number, zoneProgress: number): boolean {
-  if (germ.zoneIndex > currentZoneIndex) return true;
-  if (germ.zoneIndex < currentZoneIndex) return false;
-  return zoneProgress < (germ.indexInZone + 1) / (germ.countInZone + 1);
+/** Gum band of the arch view: half-ellipse through the tooth centres. */
+export const ARCH_GUM_PATH = `M${CX - ARCH_ELLIPSE.rx},${ARCH_ELLIPSE.cy} A${ARCH_ELLIPSE.rx},${ARCH_ELLIPSE.ry} 0 0 1 ${CX + ARCH_ELLIPSE.rx},${ARCH_ELLIPSE.cy}`;
+
+// ---------------------------------------------------------------------------
+// Steps → targets, spotlight, zoom
+// ---------------------------------------------------------------------------
+
+export interface StepRef {
+  zoneIndex: number;
+  phaseIndex: number;
 }
 
-export const countVisibleGerms = (currentZoneIndex: number, zoneProgress: number) =>
-  GERMS.filter((g) => isGermVisible(g, currentZoneIndex, zoneProgress)).length;
+export function stepInfo({ zoneIndex, phaseIndex }: StepRef) {
+  const zone = BRUSHING_ZONES[zoneIndex];
+  const view: MouthView = zone.phases[phaseIndex].view;
+  const side: Side = zone.region.endsWith("left") ? "left" : zone.region.endsWith("right") ? "right" : "front";
+  return { zone, view, arch: zone.arch as Arch, side };
+}
 
-/** First zone that brushes this region's outer surface (used to make finished teeth sparkle). */
-export const zoneIndexOfRegion = (region: ToothRegion) =>
-  BRUSHING_ZONES.findIndex((z) => z.highlight.includes(region));
+/** Tooth indices (0..9) targeted by a step. Molars are listed back to front. */
+export function targetIndices(step: StepRef): number[] {
+  const { view, side } = stepInfo(step);
+  if (view === "inside") return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+  if (side === "front") return [3, 4, 5, 6];
+  return side === "left" ? [0, 1, 2] : [9, 8, 7];
+}
 
-// ---------------------------------------------------------------------------
-// Toothbrush poses
-// ---------------------------------------------------------------------------
-
-export interface BrushPose {
+export interface Box {
   x: number;
   y: number;
-  /** SVG transform orienting the brush (drawn horizontally, bristles up, handle to the right). */
-  orient: string;
-  layer: "front" | "back";
-  motion: "circles" | "scrub" | "flick" | "sweep";
-  /** Visible handle length; short when the handle points at the viewer (inner surfaces). */
-  handle: number;
+  w: number;
+  h: number;
 }
 
-export function brushPose(region: ToothRegion | undefined): BrushPose {
-  if (!region || region === "tongue") {
-    return { x: TONGUE.cx, y: TONGUE.cy - 14, orient: "scale(1,-1)", layer: "front", motion: "sweep", handle: 64 };
-  }
-  const inner = INNER_SIDE_OF[region];
-  if (inner) {
-    const front = teethOf(inner);
-    const upper = inner.startsWith("upper");
-    return {
-      x: CX + 6,
-      y: average(front.map((t) => (upper ? t.gumY + 14 : t.gumY - 14))),
-      // Vertical brush behind the teeth, handle pointing out of the mouth.
-      orient: upper ? "rotate(90)" : "rotate(-90)",
-      layer: "back",
-      motion: "flick",
-      handle: 22,
-    };
-  }
-  const teeth = teethOf(region);
-  const upper = region.startsWith("upper");
-  const side = region.endsWith("left") ? "left" : region.endsWith("right") ? "right" : "front";
-  const x = average(teeth.map((t) => t.cx));
+const PAD = 8;
 
-  if (side === "front") {
+/** Window cut out of the dark veil around the targeted teeth. */
+export function spotlightWindow(step: StepRef): Box {
+  const { view, arch } = stepInfo(step);
+  const ids = targetIndices(step);
+  if (view === "top") {
+    const teeth = ids.map((i) => ARCH_TEETH[i]);
+    const x0 = Math.min(...teeth.map((t) => t.cx - t.size / 2 - 4));
+    const x1 = Math.max(...teeth.map((t) => t.cx + t.size / 2 + 4));
+    const y0 = Math.min(...teeth.map((t) => t.cy - t.size / 2 - 4));
+    const y1 = Math.max(...teeth.map((t) => t.cy + t.size / 2 + 4));
+    return { x: x0 - PAD, y: y0 - PAD, w: x1 - x0 + 2 * PAD, h: y1 - y0 + 2 * PAD };
+  }
+  const teeth = ids.map((i) => teethOfArch(arch)[i]);
+  const x0 = Math.min(...teeth.map((t) => t.x0));
+  const x1 = Math.max(...teeth.map((t) => t.x1));
+  const y0 = Math.min(...teeth.flatMap((t) => [t.gumY, t.tipY]));
+  const y1 = Math.max(...teeth.flatMap((t) => [t.gumY, t.tipY]));
+  return { x: x0 - PAD, y: y0 - PAD, w: x1 - x0 + 2 * PAD, h: y1 - y0 + 2 * PAD };
+}
+
+export const ZOOM = 1.9;
+
+/** viewBox of the smile drawing: zoomed on the molars for "side" steps, full otherwise. */
+export function zoomViewBox(step: StepRef): string {
+  const { view, arch } = stepInfo(step);
+  if (view !== "side") return FULL_VIEWBOX;
+  const teeth = targetIndices(step).map((i) => teethOfArch(arch)[i]);
+  const cx = teeth.reduce((s, t) => s + t.cx, 0) / teeth.length;
+  const cy = teeth.reduce((s, t) => s + t.cy, 0) / teeth.length;
+  const w = VIEW_W / ZOOM;
+  const h = VIEW_H / ZOOM;
+  const x = Math.min(Math.max(cx - w / 2, 0), VIEW_W - w);
+  const y = Math.min(Math.max(cy - h / 2, 0), VIEW_H - h);
+  return `${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Toothbrush path
+// ---------------------------------------------------------------------------
+
+export type Gesture = "circles" | "flick-down" | "flick-up" | "scrub" | "slide";
+
+export interface BrushPlan {
+  /** Points visited in order (ping-pong), one per targeted tooth. */
+  points: { x: number; y: number }[];
+  /** Seconds for one pass from the first to the last point. */
+  passSeconds: number;
+  /** SVG transform orienting the brush (drawn horizontally, bristles up, handle to the right). */
+  orient: string;
+  /** Visible handle length; short when the handle points at the viewer (inner surfaces). */
+  handle: number;
+  gesture: Gesture;
+  /** "back" = drawn behind the (see-through) teeth. */
+  layer: "front" | "back";
+}
+
+export function brushPlan(step: StepRef): BrushPlan {
+  const { view, arch, side } = stepInfo(step);
+  const ids = targetIndices(step);
+  const upper = arch === "upper";
+
+  if (view === "top") {
     return {
-      x,
-      y: average(teeth.map((t) => t.cy)),
-      orient: upper ? "" : "scale(1,-1)",
-      layer: "front",
-      motion: "circles",
+      points: ids.map((i) => ({ x: ARCH_TEETH[i].cx, y: ARCH_TEETH[i].cy })),
+      passSeconds: 2,
+      orient: side === "left" ? "scale(-1,1)" : "",
       handle: 64,
+      gesture: "slide",
+      layer: "front",
     };
   }
-  // Molars: on the chewing surface, handle sticking out on that side of the mouth.
-  const tip = average(teeth.map((t) => t.tipY));
-  const flipX = side === "left" ? -1 : 1;
-  const flipY = upper ? 1 : -1;
+  const teeth = ids.map((i) => teethOfArch(arch)[i]);
+  if (view === "inside") {
+    return {
+      points: teeth.map((t) => ({ x: t.cx, y: upper ? t.gumY + 12 : t.gumY - 12 })),
+      passSeconds: 6,
+      // Vertical brush behind the teeth, short handle pointing out of the mouth.
+      orient: upper ? "rotate(90)" : "rotate(-90)",
+      handle: 22,
+      gesture: upper ? "flick-down" : "flick-up",
+      layer: "back",
+    };
+  }
+  if (view === "side") {
+    const flipX = side === "left" ? -1 : 1;
+    return {
+      points: teeth.map((t) => ({ x: t.cx, y: t.cy })),
+      passSeconds: 2.5,
+      orient: `scale(${flipX},${upper ? 1 : -1})`,
+      handle: 64,
+      gesture: "scrub",
+      layer: "front",
+    };
+  }
   return {
-    x,
-    y: upper ? tip + 8 : tip - 8,
-    orient: `scale(${flipX},${flipY})`,
-    layer: "front",
-    motion: "scrub",
+    points: teeth.map((t) => ({ x: t.cx, y: t.cy })),
+    passSeconds: 3,
+    orient: upper ? "" : "scale(1,-1)",
     handle: 64,
+    gesture: "circles",
+    layer: "front",
   };
+}
+
+/** Brush position after `t` seconds: back and forth along the points. */
+export function brushPosition(plan: BrushPlan, t: number): { x: number; y: number } {
+  const { points, passSeconds } = plan;
+  if (points.length === 1) return points[0];
+  const cycle = Math.max(0, t) % (2 * passSeconds);
+  const u = cycle <= passSeconds ? cycle / passSeconds : 2 - cycle / passSeconds;
+  const f = u * (points.length - 1);
+  const i = Math.min(Math.floor(f), points.length - 2);
+  const k = f - i;
+  return {
+    x: points[i].x + (points[i + 1].x - points[i].x) * k,
+    y: points[i].y + (points[i + 1].y - points[i].y) * k,
+  };
+}
+
+/** How many targets the brush has reached during its first pass after `t` seconds. */
+export function reachedCount(plan: BrushPlan, t: number): number {
+  const n = plan.points.length;
+  if (t >= plan.passSeconds) return n;
+  return Math.floor((Math.max(0, t) / plan.passSeconds) * (n - 1) + 1e-9) + 1;
+}
+
+// ---------------------------------------------------------------------------
+// Shine: surfaces go from matte to shiny when the brush first reaches them
+// ---------------------------------------------------------------------------
+
+/** The step (zone, phase) that brushes a tooth's outer face or chewing top. */
+function stepForSurface(arch: Arch, index: number, surface: "outer" | "top"): StepRef | null {
+  const side = SIDES[index];
+  for (let z = 0; z < BRUSHING_ZONES.length; z++) {
+    const zone = BRUSHING_ZONES[z];
+    if (zone.arch !== arch) continue;
+    for (let p = 0; p < zone.phases.length; p++) {
+      const ref = { zoneIndex: z, phaseIndex: p };
+      const info = stepInfo(ref);
+      if (info.side !== side) continue;
+      if (surface === "outer" && (info.view === "front" || info.view === "side")) return ref;
+      if (surface === "top" && info.view === "top") return ref;
+    }
+  }
+  return null;
+}
+
+const compare = (a: StepRef, b: StepRef) => a.zoneIndex - b.zoneIndex || a.phaseIndex - b.phaseIndex;
+
+/**
+ * Is this surface already brushed? Earlier steps: yes. Later steps: no.
+ * Current step: once the brush's first pass has reached that tooth.
+ * Front-teeth tops are never a separate step, so they count as their outer face.
+ */
+export function isSurfaceShiny(
+  arch: Arch,
+  index: number,
+  surface: "outer" | "top",
+  current: StepRef,
+  phaseElapsed: number,
+  finished = false,
+): boolean {
+  if (finished) return true;
+  const ref = stepForSurface(arch, index, surface) ?? stepForSurface(arch, index, "outer");
+  if (!ref) return false;
+  const order = compare(ref, current);
+  if (order < 0) return true;
+  if (order > 0) return false;
+  const position = targetIndices(current).indexOf(index);
+  return position >= 0 && position < reachedCount(brushPlan(current), phaseElapsed);
 }

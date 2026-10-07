@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import mascotImg from "@/assets/mascot.png";
-import { BRUSHING_ZONES, TOTAL_DURATION, getZoneAt } from "@/data/brushingZones";
+import { BRUSHING_ZONES, TOTAL_DURATION, ZONE_STARTS, getPhaseAt, getZoneAt } from "@/data/brushingZones";
 import BathroomBackground from "./BathroomBackground";
 import BubbleTimer from "./BubbleTimer";
 import MouthDiagram from "./mouth/MouthDiagram";
+import MiniMap from "./mouth/MiniMap";
 import MuteButton from "./MuteButton";
 import SpeechBubble from "./SpeechBubble";
 import { Button } from "@/components/ui/button";
-import { playZoneComplete, unlockAudio } from "@/lib/sounds";
+import { playPop, playZoneComplete, unlockAudio } from "@/lib/sounds";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 
 interface BrushingScreenProps {
@@ -22,7 +23,10 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
   // Time accumulated before the current running stretch (survives pauses).
   const accumulatedMsRef = useRef(0);
   const prevZoneRef = useRef(0);
+  const prevPhaseRef = useRef(0);
   const completedRef = useRef(false);
+  const finishTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const [finished, setFinished] = useState(false);
 
   useWakeLock(true);
 
@@ -51,34 +55,43 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
   }, []);
 
   const elapsed = Math.min(TOTAL_DURATION, Math.floor(elapsedMs / 1000));
-  const { index: currentZoneIndex, zoneElapsed } = getZoneAt(elapsed);
+  const { index: currentZoneIndex } = getZoneAt(elapsed);
   const currentZone = BRUSHING_ZONES[currentZoneIndex];
+  // Fractional seconds into the zone: drives the phase, the brush path and the shine.
+  const secondsIntoZone = Math.min(
+    currentZone.durationSeconds,
+    Math.max(0, elapsedMs / 1000 - ZONE_STARTS[currentZoneIndex]),
+  );
+  const { phaseIndex, phaseElapsed } = getPhaseAt(currentZoneIndex, secondsIntoZone);
+  const currentPhase = currentZone.phases[phaseIndex];
 
+  // At 3:00: a short "everything shines" moment, then the celebration (once).
   useEffect(() => {
     if (elapsed >= TOTAL_DURATION && !completedRef.current) {
       completedRef.current = true;
-      onComplete();
+      setFinished(true);
+      finishTimerRef.current = setTimeout(onComplete, 1800);
     }
   }, [elapsed, onComplete]);
+  useEffect(() => () => clearTimeout(finishTimerRef.current), []);
 
-  // Play sound on zone change
+  // Chime on zone change, soft "plop" when a step flips to its next view.
   useEffect(() => {
     if (currentZoneIndex !== prevZoneRef.current && currentZoneIndex > 0) {
       playZoneComplete();
+    } else if (phaseIndex !== prevPhaseRef.current && phaseIndex > 0) {
+      playPop();
     }
     prevZoneRef.current = currentZoneIndex;
-  }, [currentZoneIndex]);
+    prevPhaseRef.current = phaseIndex;
+  }, [currentZoneIndex, phaseIndex]);
 
   const handleResume = () => {
     unlockAudio(); // the context may have been suspended while in background
     setPaused(false);
   };
 
-  // Smooth sub-second progress inside the zone (drives the bubble fill and germ popping).
-  const zoneProgress = Math.min(
-    1,
-    Math.max(0, (elapsedMs / 1000 - (elapsed - zoneElapsed)) / currentZone.durationSeconds),
-  );
+  const zoneProgress = secondsIntoZone / currentZone.durationSeconds;
   const remainingTotal = TOTAL_DURATION - elapsed;
   const mins = Math.floor(remainingTotal / 60);
   const secs = remainingTotal % 60;
@@ -113,8 +126,16 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
         />
 
         {/* The mouth */}
-        <div className="flex-1 w-full flex items-center justify-center">
-          <MouthDiagram currentZoneIndex={currentZoneIndex} zoneProgress={zoneProgress} />
+        <div className="relative flex-1 w-full max-w-[400px] flex items-center justify-center">
+          <MouthDiagram
+            zoneIndex={currentZoneIndex}
+            phaseIndex={phaseIndex}
+            phaseElapsed={phaseElapsed}
+            finished={finished}
+          />
+          {!finished && (
+            <MiniMap step={{ zoneIndex: currentZoneIndex, phaseIndex }} className="absolute top-0 right-0" />
+          )}
         </div>
 
         {/* Brillou explains the current zone */}
@@ -122,7 +143,7 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
           <img src={mascotImg} alt="Brillou" className="w-24 h-24 sm:w-28 sm:h-28 shrink-0 mascot-bounce drop-shadow-lg" />
           <AnimatePresence mode="wait">
             <motion.div
-              key={currentZoneIndex}
+              key={finished ? "done" : `${currentZoneIndex}-${phaseIndex}`}
               className="flex-1"
               initial={{ opacity: 0, x: 20, scale: 0.9 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -131,7 +152,7 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
             >
               <SpeechBubble>
                 <p className="font-display font-semibold text-xl sm:text-2xl leading-snug text-ink">
-                  {currentZone.instruction}
+                  {finished ? "Bravo, tout brille !" : currentPhase.instruction}
                 </p>
               </SpeechBubble>
             </motion.div>
@@ -202,18 +223,18 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
 
 function getEncouragement(elapsed: number): string {
   const messages = [
-    "Tu te débrouilles super bien ! 🌟",
-    "Continue comme ça, champion ! 💪",
-    "Tes dents vont briller ! ✨",
-    "Brillou est fier de toi ! 😊",
-    "Tu es un pro du brossage ! 🏆",
-    "Encore un peu, courage ! 🎉",
-    "Super travail ! 👏",
-    "Les microbes n'ont qu'à bien se tenir ! 🦠💨",
-    "Tes dents te disent merci ! 🦷❤️",
-    "Presque fini, bravo ! 🎊",
-    "Tu es une star du brossage ! ⭐",
-    "Magnifique technique ! 👌",
+    "Tu te débrouilles super bien\u00A0! 🌟",
+    "Continue comme ça, champion\u00A0! 💪",
+    "Tes dents vont briller\u00A0! ✨",
+    "Brillou est fier de toi\u00A0! 😊",
+    "Tu es un pro du brossage\u00A0! 🏆",
+    "Encore un peu, courage\u00A0! 🎉",
+    "Super travail\u00A0! 👏",
+    "Les microbes n'ont qu'à bien se tenir\u00A0! 🦠💨",
+    "Tes dents te disent merci\u00A0! 🦷❤️",
+    "Presque fini, bravo\u00A0! 🎊",
+    "Tu es une star du brossage\u00A0! ⭐",
+    "Magnifique technique\u00A0! 👌",
   ];
   const index = Math.floor(elapsed / 15) % messages.length;
   return messages[index];

@@ -1,17 +1,3 @@
-export interface BrushingZone {
-  id: number;
-  label: string;
-  emoji: string;
-  instruction: string;
-  durationSeconds: number;
-  /** Which teeth regions to highlight on the diagram */
-  highlight: ToothRegion[];
-  /** Arrow direction for the mascot gesture */
-  arrowDirection: "up" | "down" | "left" | "right" | "rotate" | "tongue";
-  /** Background colour family (HSL hue): upper = blue 200, lower = peach 25, tongue = pink 340 */
-  hue: number;
-}
-
 export type ToothRegion =
   | "upper-front"
   | "upper-back"
@@ -20,19 +6,79 @@ export type ToothRegion =
   | "lower-front"
   | "lower-back"
   | "lower-left"
-  | "lower-right"
-  | "tongue";
+  | "lower-right";
 
+/**
+ * How the mouth is shown during a phase:
+ * - front: smile view, outer surfaces of the front teeth
+ * - inside: smile view with see-through teeth, brush behind them (inner surfaces)
+ * - side: smile view zoomed on one side's molars (cheek side)
+ * - top: top-down view of the arch (chewing surfaces of the molars)
+ */
+export type MouthView = "front" | "inside" | "side" | "top";
+
+export interface ZonePhase {
+  view: MouthView;
+  durationSeconds: number;
+  instruction: string;
+}
+
+export interface BrushingZone {
+  id: number;
+  label: string;
+  region: ToothRegion;
+  arch: "upper" | "lower";
+  /** Background colour family (HSL hue): upper = blue 200, lower = peach 25 */
+  hue: number;
+  /** A step can chain several views (molars: cheek side, then top). */
+  phases: ZonePhase[];
+  /** Sum of the phase durations. */
+  durationSeconds: number;
+}
+
+function zone(id: number, label: string, region: ToothRegion, phases: ZonePhase[]): BrushingZone {
+  const arch = region.startsWith("upper") ? "upper" : "lower";
+  return {
+    id,
+    label,
+    region,
+    arch,
+    hue: arch === "upper" ? 200 : 25,
+    phases,
+    durationSeconds: phases.reduce((sum, p) => sum + p.durationSeconds, 0),
+  };
+}
+
+// Same order for each arch: outside → inside → back teeth left → back teeth right.
 export const BRUSHING_ZONES: BrushingZone[] = [
-  { id: 1, label: "Devant en haut", emoji: "⬆️", instruction: "Brosse le devant des dents du haut !", durationSeconds: 22, highlight: ["upper-front"], arrowDirection: "up", hue: 200 },
-  { id: 2, label: "Derrière en haut", emoji: "🔄", instruction: "Maintenant, le derrière des dents du haut !", durationSeconds: 22, highlight: ["upper-back"], arrowDirection: "rotate", hue: 200 },
-  { id: 3, label: "Molaires haut gauche", emoji: "◀️", instruction: "Frotte bien les molaires en haut à gauche !", durationSeconds: 20, highlight: ["upper-left"], arrowDirection: "left", hue: 200 },
-  { id: 4, label: "Molaires haut droite", emoji: "▶️", instruction: "Et celles en haut à droite !", durationSeconds: 20, highlight: ["upper-right"], arrowDirection: "right", hue: 200 },
-  { id: 5, label: "Devant en bas", emoji: "⬇️", instruction: "On passe en bas ! Devant d'abord !", durationSeconds: 22, highlight: ["lower-front"], arrowDirection: "down", hue: 25 },
-  { id: 6, label: "Derrière en bas", emoji: "🔄", instruction: "Et le derrière des dents du bas !", durationSeconds: 22, highlight: ["lower-back"], arrowDirection: "rotate", hue: 25 },
-  { id: 7, label: "Molaires bas gauche", emoji: "◀️", instruction: "Les molaires en bas à gauche !", durationSeconds: 20, highlight: ["lower-left"], arrowDirection: "left", hue: 25 },
-  { id: 8, label: "Molaires bas droite", emoji: "▶️", instruction: "Et celles en bas à droite !", durationSeconds: 20, highlight: ["lower-right"], arrowDirection: "right", hue: 25 },
-  { id: 9, label: "La langue !", emoji: "👅", instruction: "N'oublie pas de brosser ta langue !", durationSeconds: 12, highlight: ["tongue"], arrowDirection: "tongue", hue: 340 },
+  zone(1, "Devant en haut", "upper-front", [
+    { view: "front", durationSeconds: 22, instruction: "Brosse le devant des dents du haut\u00A0!" },
+  ]),
+  zone(2, "Derrière en haut", "upper-back", [
+    { view: "inside", durationSeconds: 22, instruction: "Maintenant, le derrière des dents du haut\u00A0!" },
+  ]),
+  zone(3, "Fond en haut à gauche", "upper-left", [
+    { view: "side", durationSeconds: 11, instruction: "Les dents du fond en haut à gauche, côté joue\u00A0!" },
+    { view: "top", durationSeconds: 12, instruction: "Et maintenant, le dessus des dents du fond\u00A0!" },
+  ]),
+  zone(4, "Fond en haut à droite", "upper-right", [
+    { view: "side", durationSeconds: 11, instruction: "Les dents du fond en haut à droite, côté joue\u00A0!" },
+    { view: "top", durationSeconds: 12, instruction: "Le dessus des dents du fond, à droite\u00A0!" },
+  ]),
+  zone(5, "Devant en bas", "lower-front", [
+    { view: "front", durationSeconds: 22, instruction: "On passe en bas ! Le devant des dents\u00A0!" },
+  ]),
+  zone(6, "Derrière en bas", "lower-back", [
+    { view: "inside", durationSeconds: 22, instruction: "Et le derrière des dents du bas\u00A0!" },
+  ]),
+  zone(7, "Fond en bas à gauche", "lower-left", [
+    { view: "side", durationSeconds: 11, instruction: "Les dents du fond en bas à gauche, côté joue\u00A0!" },
+    { view: "top", durationSeconds: 12, instruction: "Et maintenant, le dessus des dents du fond\u00A0!" },
+  ]),
+  zone(8, "Fond en bas à droite", "lower-right", [
+    { view: "side", durationSeconds: 11, instruction: "Les dents du fond en bas à droite, côté joue\u00A0!" },
+    { view: "top", durationSeconds: 12, instruction: "Le dessus des dents du fond, à droite\u00A0!" },
+  ]),
 ];
 
 // Total = 180 seconds = 3 minutes
@@ -58,4 +104,18 @@ export function getZoneAt(elapsedSeconds: number): { index: number; zoneElapsed:
     }
   }
   return { index: 0, zoneElapsed: 0 };
+}
+
+/** Phase index inside a zone and (fractional) seconds spent in that phase. */
+export function getPhaseAt(zoneIndex: number, secondsIntoZone: number): { phaseIndex: number; phaseElapsed: number } {
+  const phases = BRUSHING_ZONES[zoneIndex].phases;
+  let start = 0;
+  for (let i = 0; i < phases.length; i++) {
+    const end = start + phases[i].durationSeconds;
+    if (secondsIntoZone < end || i === phases.length - 1) {
+      return { phaseIndex: i, phaseElapsed: Math.min(Math.max(0, secondsIntoZone - start), phases[i].durationSeconds) };
+    }
+    start = end;
+  }
+  return { phaseIndex: 0, phaseElapsed: 0 };
 }

@@ -36,14 +36,15 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - `src/pages/Index.tsx` — state machine: `home` → `brushing` → `celebration`.
 - `src/components/BathroomBackground.tsx` — shared "candy bathroom" scene (tiles, optional tint, rising bubbles, foam). Every screen renders inside it.
 - `src/components/HomeScreen.tsx` — sticker title, Brillou + speech bubble, breathing 72px start button (`size="xl"`).
-- `src/components/BrushingScreen.tsx` — timestamp-based timer (`Date.now()` deltas, survives pauses), zone derived via `getZoneAt()`, pause overlay (✕ and ⏸ both open it; "Arrêter" there cancels), auto-pause on `visibilitychange`, Wake Lock. Layout: small parent timer, `BubbleTimer`, `MouthDiagram`, Brillou + `SpeechBubble` with the instruction.
-- `src/components/mouth/geometry.ts` — pure geometry/logic for the front-view mouth: teeth (8 per arch, `L L F F F F R R`), gums, tongue, germs (`GERMS`, `isGermVisible`), brush poses (`brushPose`). Unit-tested.
-- `src/components/mouth/MouthDiagram.tsx` — renders the mouth: active teeth glow mint, germs pop (`playPop`) as the zone progresses, finished teeth sparkle, brush glides between zones. Inner ("derrière") zones: front teeth see-through over a pale palate patch, brush behind them, card-flip on entering/leaving.
-- `src/components/BubbleTimer.tsx` — 9 bubbles (one per zone) filling up, then a star. `role="progressbar"`.
+- `src/components/BrushingScreen.tsx` — timestamp-based timer (`Date.now()` deltas, survives pauses), zone via `getZoneAt()` and phase via `getPhaseAt()` (fractional seconds), pause overlay (✕ and ⏸ both open it; "Arrêter" there cancels), auto-pause on `visibilitychange`, Wake Lock. At 3:00 shows "Bravo, tout brille !" + sparkle wave for 1.8 s, then `onComplete` (once). Layout: small parent timer, `BubbleTimer`, `MouthDiagram` + `MiniMap`, Brillou + `SpeechBubble` with the phase instruction.
+- `src/components/mouth/geometry.ts` — pure, unit-tested logic: smile view (10 teeth per arch: 3 molars, 4 front, 3 molars; molars have cusps), top-down arch view (`ARCH_TEETH`), `targetIndices`, `spotlightWindow`, `zoomViewBox` (1.9× on molars for "side" phases), `brushPlan`/`brushPosition` (ping-pong path across every target tooth, molars back→front), `isSurfaceShiny` (matte → shiny when the brush's first pass reaches a tooth).
+- `src/components/mouth/MouthDiagram.tsx` — renders a step: `SmileView` (front / inside with see-through teeth and brush behind / zoomed molar side, zoom = animated SVG `viewBox`) or `ArchView` (top-down chewing surfaces); spotlight = ink veil 30% clipped to the mouth with a sliding window + sunshine corner frame; target teeth mint outline + glow + one "boing"; card-flip when the drawing changes; sparkle wave when finished.
+- `src/components/mouth/MiniMap.tsx` — tiny 2×3 map of the mouth showing the current area (dashed row = inside, ▲ = top).
+- `src/components/BubbleTimer.tsx` — 8 bubbles in 2 groups of 4 (blue upper / peach lower) filling up, then a star. `role="progressbar"`.
 - `src/components/CelebrationScreen.tsx` — brand-colour confetti, fanfare, stars, restart.
 - `src/components/MuteButton.tsx`, `SpeechBubble.tsx` — small shared UI.
 - `src/components/ui/button.tsx` — candy 3D buttons (solid darker edge that collapses on press). Variants set colours only, sizes set dimensions.
-- `src/data/brushingZones.ts` — the 9 zones (label, instruction, duration, region, hue family: upper 200 / lower 25 / tongue 340). Durations sum to 180 s.
+- `src/data/brushingZones.ts` — 8 zones, each with `phases[]` (`view`: front / inside / side / top, duration, instruction). Molar zones = side 11 s + top 12 s. Hue family upper 200 / lower 25. Durations sum to 180 s. Instructions use a non-breaking space before "!".
 - `src/lib/sounds.ts` — WebAudio synthesized sounds on one shared `AudioContext`; `unlockAudio()` must be called inside a user tap (iOS); mute persisted in localStorage.
 - `src/hooks/use-wake-lock.ts` — Screen Wake Lock, re-requested when the page becomes visible.
 - `src/index.css` — palette tokens (mint, bubblegum, sunshine, ink, tile), also exposed as Tailwind colours; `.bathroom-tiles`, `.bubble`, `.sticker-title`, squash-and-stretch `.mascot-bounce`, `.breathe`.
@@ -55,7 +56,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 
 ## Product principles (keep)
 
-- One tap to start, 3 minutes, 9 zones in order (front, back, molars — upper then lower — then tongue).
+- One tap to start, 3 minutes, 8 steps in order per arch: outside → inside → back teeth left (cheek side, then top) → back teeth right; upper then lower. No tongue step.
 - Guidance must work for **pre-readers**: visual and audio first, text secondary.
 - Screen is **propped on the sink, ~60 cm away**: large, glanceable elements.
 - Mirror convention: screen-left = child's left.
@@ -81,7 +82,7 @@ npm run android    # rebuild + reinstall on the phone
 
 1. ✅ **Foundations** (done 2026-10-06) — pause button + confirm to quit; Wake Lock; timestamp-based timer; single shared `AudioContext` unlocked on the start tap + mute toggle; contrast, reduced motion, zoom; fix canine bug.
 2. ✅ **Visual overhaul** (done 2026-10-06, tag `v0.2-phone-test`) — front-facing "big smile" mouth (card-flip for inner surfaces); germs that pop + teeth that sparkle; 9-bubble visual timer (small mm:ss for parents); "candy bathroom" art direction (mint `#3CCFB4`, bubblegum `#FF7EB6`, sunshine `#FFD23F`, ink `#1E2A4A`); chunky 3D buttons; zone tints (upper blue / lower peach / tongue pink).
-2b. **Phone-test feedback** (validated by the user 2026-10-07, branch `phase-2b-feedback`):
+2b. ✅ **Phone-test feedback** (validated 2026-10-07, implemented on branch `phase-2b-feedback`; awaiting phone test):
    - **No germs.** Teeth go from matte cream `#F2EBDD` to shiny white + glint as the brush passes; sparkle wave over the whole mouth at the end.
    - **Spotlight** on target teeth: ink veil ~30% with a window around them, other teeth at 55% opacity, target bright white + solid 4px mint outline + glow, sunshine `#FFD23F` 4-corner frame, one-time "boing"; window slides between steps; no pulsing.
    - **Brush covers the whole zone**: travels across every target tooth (ping-pong) with the gesture on top — circles (front), flicks gum→tip (inner), scrub (molar cheek side), flat slide (molar tops).
