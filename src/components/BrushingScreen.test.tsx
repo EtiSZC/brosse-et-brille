@@ -2,8 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import BrushingScreen from "./BrushingScreen";
 import { speak, stopSpeaking } from "@/lib/voice";
+import { isMusicOn, startMusic, stopMusic } from "@/lib/music";
 
 vi.mock("@/lib/voice", () => ({ speak: vi.fn(), stopSpeaking: vi.fn(), preloadVoice: vi.fn() }));
+vi.mock("@/lib/music", () => ({
+  isMusicOn: vi.fn(() => true),
+  startMusic: vi.fn(),
+  stopMusic: vi.fn(),
+  subscribeMusic: vi.fn(() => () => {}),
+}));
 
 const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
@@ -17,6 +24,9 @@ describe("BrushingScreen", () => {
     vi.useFakeTimers();
     vi.mocked(speak).mockClear();
     vi.mocked(stopSpeaking).mockClear();
+    vi.mocked(startMusic).mockClear();
+    vi.mocked(stopMusic).mockClear();
+    vi.mocked(isMusicOn).mockReturnValue(true);
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -110,5 +120,23 @@ describe("BrushingScreen", () => {
     expect(screen.queryByTestId(/side-marker/)).not.toBeInTheDocument();
     advance(41000); // 46 s: upper-left back teeth
     expect(screen.getByTestId("side-marker-left")).toBeInTheDocument();
+  });
+
+  it("plays the music with the session, stops on pause and resumes in sync", () => {
+    render(<BrushingScreen onComplete={() => {}} onCancel={() => {}} />);
+    expect(startMusic).toHaveBeenCalledWith(0);
+    advance(5000);
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(stopMusic).toHaveBeenCalled();
+    vi.mocked(startMusic).mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Continuer/ }));
+    expect(startMusic).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(startMusic).mock.calls[0][0]).toBeCloseTo(5, 0);
+  });
+
+  it("doesn't start the music when 🎵 is off", () => {
+    vi.mocked(isMusicOn).mockReturnValue(false);
+    render(<BrushingScreen onComplete={() => {}} onCancel={() => {}} />);
+    expect(startMusic).not.toHaveBeenCalled();
   });
 });

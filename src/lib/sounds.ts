@@ -29,6 +29,9 @@ function getCtx(): AudioContext | null {
   return ctx;
 }
 
+/** The shared context (created/resumed on demand), or null without Web Audio. */
+export const getAudioContext = (): AudioContext | null => getCtx();
+
 /** Call from a user gesture (tap) so later, timer-driven sounds are allowed on iOS. */
 export function unlockAudio() {
   const c = getCtx();
@@ -88,6 +91,16 @@ function playTone(frequency: number, duration: number, type: OscillatorType = 's
 
 const clipCache = new Map<string, Promise<AudioBuffer | null>>();
 let currentClip: AudioBufferSourceNode | null = null;
+const clipListeners = new Set<(playing: boolean) => void>();
+
+/** Notified when a clip starts/stops (the music lowers its volume meanwhile). */
+export function subscribeClip(listener: (playing: boolean) => void) {
+  clipListeners.add(listener);
+  return () => {
+    clipListeners.delete(listener);
+  };
+}
+const notifyClip = (playing: boolean) => clipListeners.forEach((l) => l(playing));
 
 /** Fetch + decode a clip once; later calls reuse it. Resolves null on failure. */
 export function loadClip(url: string): Promise<AudioBuffer | null> {
@@ -108,12 +121,14 @@ export function loadClip(url: string): Promise<AudioBuffer | null> {
 }
 
 export function stopClip() {
+  const wasPlaying = currentClip !== null;
   try {
     currentClip?.stop();
   } catch {
     // already stopped
   }
   currentClip = null;
+  if (wasPlaying) notifyClip(false);
 }
 
 /**
@@ -133,10 +148,14 @@ export async function playClip(url: string, stillWanted: () => boolean = () => t
   source.buffer = buffer;
   source.connect(c.destination);
   source.onended = () => {
-    if (currentClip === source) currentClip = null;
+    if (currentClip === source) {
+      currentClip = null;
+      notifyClip(false);
+    }
   };
   source.start();
   currentClip = source;
+  notifyClip(true);
   return true;
 }
 

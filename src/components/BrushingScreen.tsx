@@ -10,9 +10,11 @@ import { stepInfo } from "./mouth/geometry";
 import Countdown from "./Countdown";
 import SideMarker from "./SideMarker";
 import MuteButton from "./MuteButton";
+import MusicButton from "./MusicButton";
 import SpeechBubble from "./SpeechBubble";
 import { Button } from "@/components/ui/button";
-import { playPop, playTick, playZoneComplete, unlockAudio } from "@/lib/sounds";
+import { isMuted, playPop, playTick, playZoneComplete, subscribeMuted, unlockAudio } from "@/lib/sounds";
+import { isMusicOn, startMusic, stopMusic, subscribeMusic } from "@/lib/music";
 import { preloadVoice, speak, stopSpeaking } from "@/lib/voice";
 import { FINISH_LINE } from "@/data/voiceLines";
 import { useWakeLock } from "@/hooks/use-wake-lock";
@@ -117,6 +119,20 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
 
   const { side } = stepInfo({ zoneIndex: currentZoneIndex, phaseIndex });
 
+  // Background music: follows the session clock (pause/resume stay in sync),
+  // reacts to the 🎵 and 🔊 toggles, stops at the end or when leaving.
+  const [musicOn, setMusicOnState] = useState(isMusicOn);
+  const [muted, setMutedState] = useState(isMuted);
+  useEffect(() => subscribeMusic(setMusicOnState), []);
+  useEffect(() => subscribeMuted(setMutedState), []);
+  const elapsedMsRef = useRef(0);
+  elapsedMsRef.current = elapsedMs;
+  useEffect(() => {
+    if (musicOn && !muted && !paused && !finished) startMusic(elapsedMsRef.current / 1000);
+    else stopMusic();
+  }, [musicOn, muted, paused, finished]);
+  useEffect(() => () => stopMusic(), []);
+
   const handleResume = () => {
     unlockAudio(); // the context may have been suspended while in background
     setPaused(false);
@@ -133,7 +149,10 @@ const BrushingScreen = ({ onComplete, onCancel }: BrushingScreenProps) => {
       <div className="flex flex-col items-center flex-1 px-4 pt-4 pb-6 gap-3 sm:gap-4">
         {/* Top bar: mute · small parent timer · stop */}
         <div className="w-full max-w-md flex items-center justify-between">
-          <MuteButton />
+          <div className="flex gap-2">
+            <MuteButton />
+            <MusicButton />
+          </div>
           <p
             className="px-4 py-1 rounded-full bg-white/70 border-2 border-ink/15 text-lg font-display font-semibold text-ink tabular-nums"
             aria-label={`Temps restant ${remainingLabel}`}
