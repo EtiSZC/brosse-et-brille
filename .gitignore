@@ -29,3 +29,6 @@ screenshots
 # Personal Claude Code settings
 .claude/settings.local.json
 voice-samples/
+
+# Built APKs kept locally (not versioned)
+releases/

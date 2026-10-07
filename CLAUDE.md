@@ -25,6 +25,12 @@ Don't use Playwright's fake clock (`page.clock`) for visual checks: it desyncs f
 npm run android   # build web → cap sync → gradle assembleDebug → adb install → launch
 ```
 
+Built APKs are copied to `releases/` (git-ignored, kept locally) as `brosse-et-brille-vX.Y-debug.apk` + a `.sha256` checksum:
+
+| File | Built from | Content |
+|---|---|---|
+| `releases/brosse-et-brille-v0.5-debug.apk` | `main` @ `d54f1cd` (code of `f719fab`), 2026-10-07 | Phases 1–4: spotlight mouth, Lily voice, calendar, random stickers. Debug-signed: install with `adb install -r <file>` (or copy to the phone and allow installs from unknown sources). |
+
 Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capacitor/assets generate --android --iconBackgroundColor '#DFF7F0' --splashBackgroundColor '#DFF7F0'`. Fonts are bundled via `@fontsource` (no network needed at runtime).
 
 ## Brillou's voice (ElevenLabs)
