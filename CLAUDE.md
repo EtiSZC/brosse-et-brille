@@ -46,9 +46,9 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 
 ## Architecture
 
-- `src/pages/Index.tsx` — state machine: `home` → `brushing` → `celebration`.
+- `src/pages/Index.tsx` — state machine: `home` → `brushing` → `celebration`, plus `album`. On completion it calls `recordSession()` and passes the result (slot, new sticker, streak) to the celebration.
 - `src/components/BathroomBackground.tsx` — shared "candy bathroom" scene (tiles, optional tint, rising bubbles, foam). Every screen renders inside it.
-- `src/components/HomeScreen.tsx` — sticker title, Brillou + speech bubble, breathing 72px start button (`size="xl"`).
+- `src/components/HomeScreen.tsx` — sticker title, Brillou + speech bubble, `WeekCalendar` + streak, 📒 album button (top right, sticker-count badge), breathing 72px start button (`size="xl"`).
 - `src/components/BrushingScreen.tsx` — timestamp-based timer (`Date.now()` deltas, survives pauses), zone via `getZoneAt()` and phase via `getPhaseAt()` (fractional seconds), pause overlay (✕ and ⏸ both open it; "Arrêter" there cancels), auto-pause on `visibilitychange`, Wake Lock. At 3:00 shows "Bravo, tout brille !" + sparkle wave for 1.8 s, then `onComplete` (once). Layout: small parent timer, `BubbleTimer`, `MouthDiagram` + `MiniMap`, Brillou + `SpeechBubble` with the phase instruction.
 - `src/components/mouth/geometry.ts` — pure, unit-tested logic: smile view (10 teeth per arch: 3 molars, 4 front, 3 molars; molars have cusps), top-down arch view (`ARCH_TEETH`), `targetIndices`, `spotlightWindow`, `zoomViewBox` (1.9× on molars for "side" phases), `brushPlan`/`brushPosition` (ping-pong path across every target tooth, molars back→front), `isSurfaceShiny` (matte → shiny when the brush's first pass reaches a tooth).
 - `src/components/mouth/MouthDiagram.tsx` — renders a step: `SmileView` (front / inside with see-through teeth and brush behind / zoomed molar side, zoom = animated SVG `viewBox`) or `ArchView` (top-down chewing surfaces); spotlight = ink veil 30% clipped to the mouth with a sliding window + sunshine corner frame; target teeth mint outline + glow + one "boing"; card-flip when the drawing changes; sparkle wave when finished.
@@ -58,7 +58,10 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - `src/components/SideMarker.tsx` — pulsing sunshine arrow on the edge of the screen for the side being brushed (back-teeth steps).
 - `src/components/mouth/MiniMap.tsx` — tiny 2×3 map of the mouth showing the current area (dashed row = inside, ▲ = top).
 - `src/components/BubbleTimer.tsx` — 8 bubbles in 2 groups of 4 (blue upper / peach lower) filling up, then a star. `role="progressbar"`.
-- `src/components/CelebrationScreen.tsx` — brand-colour confetti, fanfare, stars, restart.
+- `src/components/CelebrationScreen.tsx` — brand-colour confetti, fanfare, Lily's "Bravo", new-sticker card (or stars + kind note if the slot was already filled), CTA "☀️ À ce soir !" (morning) / "🌙 À demain !" (evening) back to home, "📒 Mon album".
+- `src/lib/progress.ts` — on-device history (localStorage `brosse-brille:progress:v1`, versioned, per-profile with a single `default` profile for now): `recordSession` (morning < 14 h ≤ evening; one session and one sticker per slot), forgiving `streakOf` (≥ 1 slot per day; today not done yet doesn't break it), `weekOf` (Monday → Sunday), 20 `STICKERS` (never germ-themed). Unit-tested.
+- `src/components/WeekCalendar.tsx` — ☀️/🌙 per day for the current week, today outlined, streak chip ("🔥 3 jours de suite !").
+- `src/components/StickerAlbum.tsx` — 4-column grid of the 20 stickers (earned vs dashed "?"), counter, back button.
 - `src/components/MuteButton.tsx`, `SpeechBubble.tsx` — small shared UI.
 - `src/components/ui/button.tsx` — candy 3D buttons (solid darker edge that collapses on press). Variants set colours only, sizes set dimensions.
 - `src/data/brushingZones.ts` — 8 zones, each with `phases[]` (`view`: front / inside / side / top, duration, instruction). Molar zones = side 11 s + top 12 s. Hue family upper 200 / lower 25. Durations sum to 180 s. Instructions use a non-breaking space before "!".
@@ -78,7 +81,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - Screen is **propped on the sink, ~60 cm away**: large, glanceable elements.
 - Mirror convention: screen-left = child's left.
 - **Privacy**: no accounts, no tracking, no third-party SDKs; all data stays on device (COPPA / GDPR-K).
-- **No dark patterns**: no ads, currency, loot boxes, guilt ("Brillou est triste"), streak punishment, or extra screen time after brushing. No scoring of brushing quality.
+- **No dark patterns**: no ads, currency, loot boxes, guilt ("Brillou est triste"), streak punishment, or extra screen time after brushing. No scoring of brushing quality. Brushing twice in the same slot never earns an extra sticker; the end of a session points back to the next brushing ("À ce soir !"), not to more screen time.
 
 ## Restore points (git tags)
 
@@ -109,5 +112,5 @@ npm run android    # rebuild + reinstall on the phone
    - **No tongue step** (tongue drawn as neutral anatomy only).
    - **8 steps / 180 s**, same order per arch: Devant 22 s → Derrière (front + molars, inner side) 22 s → Fond gauche 23 s (cheek side 11 s, then top 12 s) → Fond droite 23 s; upper then lower. BubbleTimer: 8 bubbles in 2 groups of 4.
 3. ✅ **Guidance** (done 2026-10-07, merged; voice = pre-recorded ElevenLabs Lily clips) — Brillou speaks each instruction (pre-recorded Lily clips, device TTS fallback), stops on pause and repeats on resume, "Bravo" at the end; 3-2-1 badge + tick before each step/view change; pulsing side arrow for back-teeth steps (words kept in the bubble for parents).
-4. **Retention** — sun/moon weekly calendar (localStorage, per-profile data model); sticker album (not germ-themed); forgiving streaks; end CTA "À ce soir !" instead of "Recommencer".
+4. ✅ **Retention** (done 2026-10-07, branch `phase-4-retention`; awaiting phone test) — sun/moon weekly calendar on home; forgiving day streak; one sticker per new morning/evening slot (20 emoji stickers, album screen); celebration CTA "À ce soir !" / "À demain !" instead of "Recommencer". All on device, per-profile data model ready for child profiles.
 5. **Later** — Brillou poses (needs illustration), child profiles, gated parent corner, optional local reminders, music mode, signed release build for Google Play.
