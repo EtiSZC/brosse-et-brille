@@ -31,6 +31,7 @@ Built APKs are copied to `releases/` (git-ignored, kept locally) as `brosse-et-b
 |---|---|---|
 | `releases/brosse-et-brille-v0.5-debug.apk` | `main` @ `d54f1cd` (code of `f719fab`), 2026-10-07 | Phases 1–4: spotlight mouth, Lily voice, calendar, random stickers. Debug-signed: install with `adb install -r <file>` (or copy to the phone and allow installs from unknown sources). |
 | `releases/brosse-et-brille-v0.6-debug.apk` | `main` @ `25c2490` (code of `2b2e162`), 2026-10-07 | v0.5 + child profiles (up to 4, picker, brushing together, parents screen behind a 2 s hold), plural Lily line. |
+| `releases/brosse-et-brille-v0.7-debug.apk` | `main` (code of `4e5733d`), 2026-10-07 | v0.6 + music mode (synthesized loop synced to the steps, on by default, 🎵 toggle, ducks under the voice). |
 
 Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capacitor/assets generate --android --iconBackgroundColor '#DFF7F0' --splashBackgroundColor '#DFF7F0'`. Fonts are bundled via `@fontsource` (no network needed at runtime).
 
@@ -128,5 +129,5 @@ npm run android    # rebuild + reinstall on the phone
 3. ✅ **Guidance** (done 2026-10-07, merged; voice = pre-recorded ElevenLabs Lily clips) — Brillou speaks each instruction (pre-recorded Lily clips, device TTS fallback), stops on pause and repeats on resume, "Bravo" at the end; 3-2-1 badge + tick before each step/view change; pulsing side arrow for back-teeth steps (words kept in the bubble for parents).
 4. ✅ **Retention** (done 2026-10-07, merged; validated on the phone) — sun/moon weekly calendar on home; forgiving day streak; one random sticker per new morning/evening slot (20 emoji stickers, never twice the same; album screen); celebration CTA "À ce soir !" / "À demain !" instead of "Recommencer". All on device, per-profile data model ready for child profiles.
 5. ✅ **Child profiles** (done 2026-10-07, merged; validated on the phone) — up to 4 profiles (name + animal emoji), "Qui se brosse les dents ?" picker when ≥ 2, brushing together (each child gets their slot and sticker), per-child calendar/streak/album, parents screen behind a 2 s long press. Names shown on screen, never spoken or sent anywhere.
-6. ✅ **Music mode** (done 2026-10-07, branch `phase-6-music`; awaiting phone test) — synthesized cheerful loop synced to the steps, on by default (🎵 toggle), ducks under Brillou's voice. ElevenLabs Music was tried first but its API needs a paid plan.
+6. ✅ **Music mode** (done 2026-10-07, merged; validated on the phone) — synthesized cheerful loop synced to the steps, on by default (🎵 toggle), ducks under Brillou's voice. ElevenLabs Music was tried first but its API needs a paid plan.
 7. **Later** — Brillou poses (needs illustration), parent corner with history/tips, optional local reminders, signed release build for Google Play (+ paid ElevenLabs plan and regenerated clips for commercial use).
