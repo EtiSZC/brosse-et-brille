@@ -105,11 +105,12 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 | `v0.4-voice` | Phase 3 on top of v0.3: Brillou speaks every instruction with pre-recorded ElevenLabs clips (voice Lily, device TTS fallback), 3-2-1 countdown badge + tick, side arrows for back-teeth steps. Validated on the Galaxy A55 on 2026-10-07. Last version before Phase 4 (calendar, stickers, streaks). |
 | `v0.5-stickers` | Phase 4 on top of v0.4: on-device history, sun/moon weekly calendar, forgiving streak, random stickers (20) + album, "À ce soir !" / "À demain !". Single child (one `default` profile). APK: `releases/brosse-et-brille-v0.5-debug.apk`. Validated on the Galaxy A55 on 2026-10-07. Last version before Phase 5 (child profiles). |
 | `v0.6-profiles` | Phase 5 on top of v0.5: up to 4 child profiles (name + animal emoji), "Qui se brosse les dents ?" picker, brushing together, parents screen behind a 2 s hold, per-child calendar/streak/album. APK: `releases/brosse-et-brille-v0.6-debug.apk`. Validated on the Galaxy A55 on 2026-10-07. Last version before the music mode. |
+| `v0.7-music` | Music mode on top of v0.6: synthesized loop synced to the steps, on by default, 🎵 toggle, ducks under the voice. APK: `releases/brosse-et-brille-v0.7-debug.apk`. Validated on the Galaxy A55 on 2026-10-07. Last version before two-phone QR sync. |
 
 To go back to a restore point:
 
 ```bash
-git switch -c restore-v0.6 v0.6-profiles      # new branch from a tag (keeps main untouched); or v0.5-stickers, v0.4-voice, v0.3-spotlight, v0.2-phone-test
+git switch -c restore-v0.7 v0.7-music         # new branch from a tag (keeps main untouched); or v0.6-profiles, v0.5-stickers, v0.4-voice, v0.3-spotlight, v0.2-phone-test
 npm install
 npm run dev        # web
 npm run android    # rebuild + reinstall on the phone
