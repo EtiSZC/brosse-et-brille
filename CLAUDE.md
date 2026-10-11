@@ -73,6 +73,9 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - `src/components/ProfilePicker.tsx` — "Qui se brosse les dents ?": one tap = one child; "Brosser ensemble" = multi-select; parents gate.
 - `src/components/ParentsScreen.tsx` — add / rename / avatar / delete (with confirmation) profiles. Reached only through `LongPressButton` (hold 2 s; touch, mouse and keyboard).
 - Home: active-profile chip (≥ 2 profiles), greeting with the name, one compact line per child when brushing together, "⚙︎ Parents" gate at the bottom. Album: one tab per child. Celebration: "Bravo Léa et Tom !", one sticker card per child, plural voice line.
+- `src/lib/sync.ts` — two-phone sync without backend: `encodeState()` → `BB1` + ASCII JSON (per child: id, name, avatar index, 2-bit/day bitmap of the last 400 days, 20-bit sticker mask; ~130 chars for 2 children, < 1 000 for 4 × 2 years), strict `decodeState()`, `suggestMatches()` (by id, then normalized name, else add/ignore), `mergeState()` = union of brushings and stickers (never removes), matched ids converge on the smaller one; names/avatars and settings stay per phone; deletions are not propagated. Unit-tested (idempotent, both directions equal).
+- `src/lib/scanner.ts` — `@capacitor-mlkit/barcode-scanning` `scan()` (Google code scanner UI, no camera permission; module pre-downloaded via `barcode_ui` meta-data in `AndroidManifest.xml`). Browser: no scanner → "Coller un code".
+- `src/components/SyncScreen.tsx` — parents area → "Synchroniser": this phone's QR (`qrcode`, SVG) → scan / paste the other phone's → "Qui est qui ?" (first time) → preview ("+3 brossages, +2 autocollants") → Fusionner → "À votre tour" with the updated QR so the other phone scans back.
 - `src/components/WeekCalendar.tsx` — ☀️/🌙 per day for the current week, today outlined, streak chip ("🔥 3 jours de suite !").
 - `src/components/StickerAlbum.tsx` — 4-column grid of the 20 stickers (earned vs dashed "?"), counter, back button.
 - `src/components/MuteButton.tsx`, `SpeechBubble.tsx` — small shared UI.
@@ -93,7 +96,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - Guidance must work for **pre-readers**: visual and audio first, text secondary.
 - Screen is **propped on the sink, ~60 cm away**: large, glanceable elements.
 - Mirror convention: screen-left = child's left.
-- **Privacy**: no accounts, no tracking, no third-party SDKs; all data stays on device (COPPA / GDPR-K). Child profiles hold only a first name/nickname and an emoji avatar — no photo, age or surname.
+- **Privacy**: no accounts, no tracking, no third-party SDKs; all data stays on device (COPPA / GDPR-K). Child profiles hold only a first name/nickname and an emoji avatar — no photo, age or surname. Two-phone sync goes QR → camera only (no network); the QR contains first names and history and is shown only in the parents area.
 - **No dark patterns**: no ads, currency, loot boxes, guilt ("Brillou est triste"), streak punishment, or extra screen time after brushing. No scoring of brushing quality. Brushing twice in the same slot never earns an extra sticker; the end of a session points back to the next brushing ("À ce soir !"), not to more screen time.
 
 ## Restore points (git tags)
@@ -131,4 +134,5 @@ npm run android    # rebuild + reinstall on the phone
 4. ✅ **Retention** (done 2026-10-07, merged; validated on the phone) — sun/moon weekly calendar on home; forgiving day streak; one random sticker per new morning/evening slot (20 emoji stickers, never twice the same; album screen); celebration CTA "À ce soir !" / "À demain !" instead of "Recommencer". All on device, per-profile data model ready for child profiles.
 5. ✅ **Child profiles** (done 2026-10-07, merged; validated on the phone) — up to 4 profiles (name + animal emoji), "Qui se brosse les dents ?" picker when ≥ 2, brushing together (each child gets their slot and sticker), per-child calendar/streak/album, parents screen behind a 2 s long press. Names shown on screen, never spoken or sent anywhere.
 6. ✅ **Music mode** (done 2026-10-07, merged; validated on the phone) — synthesized cheerful loop synced to the steps, on by default (🎵 toggle), ducks under Brillou's voice. ElevenLabs Music was tried first but its API needs a paid plan.
-7. **Later** — Brillou poses (needs illustration), parent corner with history/tips, optional local reminders, signed release build for Google Play (+ paid ElevenLabs plan and regenerated clips for commercial use).
+7. ✅ **Two-phone sync** (done 2026-10-11, branch `phase-7-sync`; awaiting phone test) — QR code both ways from the parents area, offline, no backend; union merge so no sticker or brushing is ever lost.
+8. **Later** — Brillou poses (needs illustration), parent corner with history/tips, optional local reminders, signed release build for Google Play (+ paid ElevenLabs plan and regenerated clips for commercial use).
