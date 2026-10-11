@@ -15,10 +15,12 @@ import { cn } from "@/lib/utils";
 
 interface ParentsScreenProps {
   onBack: () => void;
+  /** Opens phone-to-phone sync (QR codes). */
+  onSync: () => void;
 }
 
 /** Profile management (behind the long-press gate): names, avatars, add, delete. */
-const ParentsScreen = ({ onBack }: ParentsScreenProps) => {
+const ParentsScreen = ({ onBack, onSync }: ParentsScreenProps) => {
   const [profiles, setProfiles] = useState<ProfileMeta[]>(listProfiles);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const refresh = () => setProfiles(listProfiles());
@@ -127,6 +129,16 @@ const ParentsScreen = ({ onBack }: ParentsScreenProps) => {
             + Ajouter un enfant
           </Button>
         )}
+
+        <div className="w-full max-w-md bg-white border-[3px] border-ink rounded-3xl p-4 flex flex-col gap-3 shadow-[0_4px_0_hsl(var(--ink)/0.15)]">
+          <p className="font-display font-bold text-lg text-ink">📱 Deux téléphones ?</p>
+          <p className="text-sm font-body font-semibold text-muted-foreground">
+            Gardez les mêmes autocollants et le même calendrier sur le téléphone de l'autre parent : chacun scanne le QR code de l'autre, sans internet.
+          </p>
+          <Button variant="secondary" onClick={onSync}>
+            Synchroniser avec un autre téléphone
+          </Button>
+        </div>
       </div>
     </BathroomBackground>
   );

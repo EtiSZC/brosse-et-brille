@@ -47,7 +47,7 @@ describe("profile screens", () => {
   });
 
   it("parents screen: add a child, name them, and confirm before deleting", () => {
-    render(<ParentsScreen onBack={() => {}} />);
+    render(<ParentsScreen onBack={() => {}} onSync={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: /Ajouter un enfant/ }));
     const inputs = screen.getAllByLabelText("Prénom ou surnom");
     expect(inputs).toHaveLength(2);

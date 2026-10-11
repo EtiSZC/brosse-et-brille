@@ -10,7 +10,7 @@ export interface Session {
   slot: Slot;
 }
 
-interface ProfileData {
+export interface ProfileData {
   sessions: Session[];
   /** Sticker ids in the order they were earned. */
   stickers: string[];
@@ -23,7 +23,7 @@ export interface ProfileMeta {
   avatar: string;
 }
 
-interface ProgressData {
+export interface ProgressData {
   version: 2;
   profiles: ProfileMeta[];
   data: Record<string, ProfileData>;
@@ -127,6 +127,11 @@ function saveProgress(data: ProgressData) {
   } catch {
     // Storage unavailable (private mode / full): keep going without saving.
   }
+}
+
+/** Replace the whole state (used by phone-to-phone sync), repaired by `normalize()`. */
+export function replaceProgress(data: ProgressData) {
+  saveProgress(normalize(data));
 }
 
 /** History of one profile (the first active one by default). */
