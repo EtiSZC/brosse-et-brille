@@ -32,7 +32,7 @@ Built APKs are copied to `releases/` (git-ignored, kept locally) as `brosse-et-b
 | `releases/brosse-et-brille-v0.5-debug.apk` | `main` @ `d54f1cd` (code of `f719fab`), 2026-10-07 | Phases 1–4: spotlight mouth, Lily voice, calendar, random stickers. Debug-signed: install with `adb install -r <file>` (or copy to the phone and allow installs from unknown sources). |
 | `releases/brosse-et-brille-v0.6-debug.apk` | `main` @ `25c2490` (code of `2b2e162`), 2026-10-07 | v0.5 + child profiles (up to 4, picker, brushing together, parents screen behind a 2 s hold), plural Lily line. |
 | `releases/brosse-et-brille-v0.7-debug.apk` | `main` (code of `4e5733d`), 2026-10-07 | v0.6 + music mode (synthesized loop synced to the steps, on by default, 🎵 toggle, ducks under the voice). |
-| `releases/brosse-et-brille-v0.8-debug.apk` | `main` (code of `065f338`), 2026-10-11 | v0.7 + two-phone sync by QR code (parents area → Synchroniser; union merge, no backend). |
+| `releases/brosse-et-brille-v0.8-debug.apk` | `main` @ `ca5fe75` (code of `ecd988e`), rebuilt 2026-10-11 14:16 | v0.7 + two-phone sync by QR code (parents area → Synchroniser; union merge with the `findLosses()` safety net, no backend). 31 MB: the ML Kit plugin bundles `libbarhopper_v3.so` for 4 ABIs although scanning uses the Play-services code scanner — can be trimmed later. |
 
 Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capacitor/assets generate --android --iconBackgroundColor '#DFF7F0' --splashBackgroundColor '#DFF7F0'`. Fonts are bundled via `@fontsource` (no network needed at runtime).
 
