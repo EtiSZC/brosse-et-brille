@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { STICKERS, toDay, type ProgressData, type Session } from "./progress";
-import { SYNC_PREFIX, decodeState, encodeState, mergeState, normalizeName, suggestMatches } from "./sync";
+import { STICKERS, getProfile, recordSession, replaceProgress, toDay, type ProgressData, type Session } from "./progress";
+import { SYNC_PREFIX, decodeState, encodeState, findLosses, mergeState, normalizeName, suggestMatches } from "./sync";
 
 const NOW = new Date(2026, 9, 11, 9);
 const day = (offset: number) => {
@@ -132,5 +132,69 @@ describe("sync merge", () => {
     const m = suggestMatches(local, remote);
     expect(m.find((x) => x.remote.id === "p2")!.target).toEqual({ kind: "local", id: "p2" });
     expect(m.find((x) => x.remote.id === "p9")!.target).toEqual({ kind: "local", id: "p1" });
+  });
+});
+
+describe("sticker safety (a sync never loses a sticker)", () => {
+  const album = (d: ProgressData, name: string) => [...d.data[d.profiles.find((p) => normalizeName(p.name) === normalizeName(name))!.id].stickers].sort();
+  const lea = (id: string, stickers: string[], sessions: Session[] = []) => state([{ id, name: "Léa", sessions, stickers }]);
+
+  it("a phone that is behind catches up, and the up-to-date phone loses nothing", () => {
+    const ahead = lea("pa", ["unicorn", "rocket", "lion"]);
+    const behind = lea("pb", ["unicorn"]);
+    expect(album(sync(behind, ahead), "Léa")).toEqual(["lion", "rocket", "unicorn"]);
+    expect(album(sync(ahead, behind), "Léa")).toEqual(["lion", "rocket", "unicorn"]);
+  });
+
+  it("different albums on each phone: after both scans, both have every sticker", () => {
+    const a = lea("pa", ["unicorn", "rocket"]);
+    const b = lea("pb", ["lion", "bee"]);
+    const a1 = sync(a, b); // A scans B
+    const b1 = sync(b, a1); // B scans A's updated code ("À votre tour")
+    const union = ["bee", "lion", "rocket", "unicorn"];
+    expect(album(a1, "Léa")).toEqual(union);
+    expect(album(b1, "Léa")).toEqual(union);
+    const { summary } = mergeState(a, suggestMatches(a, decode(encodeState(b, NOW))));
+    expect(summary[0].addedStickers).toBe(2);
+  });
+
+  it("same brushing on both phones with a different sticker drawn: both stickers are kept, no duplicate", () => {
+    const slot: Session[] = [{ date: day(-1), slot: "morning" }];
+    const a1 = sync(lea("pa", ["lion"], slot), lea("pb", ["bee"], slot));
+    const k = a1.data[a1.profiles[0].id];
+    expect(k.stickers.sort()).toEqual(["bee", "lion"]);
+    expect(new Set(k.stickers).size).toBe(k.stickers.length);
+    expect(k.sessions).toHaveLength(1); // the brushing itself counts once
+  });
+
+  it("an ignored child, or one that doesn't fit (4 profiles), leaves this phone's albums untouched", () => {
+    const local = lea("pa", ["unicorn", "rocket"]);
+    const remote = decode(encodeState(lea("pb", ["lion"]), NOW));
+    const ignored = mergeState(local, [{ remote: remote[0], target: { kind: "ignore" } }]).data;
+    expect(ignored.data).toEqual(local.data);
+
+    const full = state(["A", "B", "C", "D"].map((n, i) => ({ id: `p${i}`, name: n, stickers: ["bee"] })));
+    const zoe = decode(encodeState(state([{ id: "pz", name: "Zoé", stickers: ["fox"] }]), NOW));
+    expect(sync(full, state([{ id: "pz", name: "Zoé", stickers: ["fox"] }])).data).toEqual(full.data);
+    expect(suggestMatches(full, zoe)[0].target).toEqual({ kind: "ignore" });
+  });
+
+  it("a complete album (20/20) reaches the other phone, which then draws no duplicate", () => {
+    const all = STICKERS.map((s) => s.id);
+    const b1 = sync(lea("pb", ["unicorn", "rocket"]), lea("pa", all));
+    expect(album(b1, "Léa")).toHaveLength(20);
+    replaceProgress(b1);
+    const id = b1.profiles[0].id;
+    expect(recordSession(new Date(2026, 9, 11, 20), id).newSticker).toBeNull();
+    expect(new Set(getProfile(id).stickers).size).toBe(20);
+  });
+
+  it("the safety net detects any loss (stickers, brushings, a renamed child)", () => {
+    const before = lea("pb", ["unicorn", "lion"], [{ date: day(-1), slot: "evening" }]);
+    const shrunk = lea("pb", ["unicorn"], []);
+    expect(findLosses(before, shrunk)).toEqual(["Léa: autocollant lion", `Léa: brossage ${day(-1)} soir`]);
+    const renamed = lea("pa", ["unicorn", "lion"], [{ date: day(-1), slot: "evening" }]);
+    expect(findLosses(before, renamed, { pb: "pa" })).toEqual([]);
+    expect(findLosses(before, renamed)).toEqual(["Léa: profil disparu"]);
   });
 });

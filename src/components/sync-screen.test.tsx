@@ -60,6 +60,17 @@ describe("sync screen", () => {
     expect(listProfiles().some((p) => p.name === "Zoé")).toBe(true);
   });
 
+  it("ignoring a child keeps this phone's stickers and says nothing is removed", () => {
+    render(<SyncScreen onBack={() => {}} />);
+    paste(otherPhone([{ id: "premoteLea", name: "lea", avatar: "🐼", stickers: ["rocket", "lion"], sessions: [] }]));
+    fireEvent.change(screen.getByLabelText("lea correspond à"), { target: { value: "ignore" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    expect(screen.getByText("ignoré · rien n'est retiré ici")).toBeInTheDocument();
+    expect(screen.getByText(/aucun autocollant ni brossage n'est jamais retiré/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Fusionner" }));
+    expect(getProfile(leaId).stickers).toEqual(["unicorn"]); // untouched
+  });
+
   it("already-paired phones go straight to the preview", () => {
     const code = otherPhone(
       listProfiles().map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, stickers: ["lion"], sessions: [] })),

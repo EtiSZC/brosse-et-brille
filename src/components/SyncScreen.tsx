@@ -79,10 +79,24 @@ const SyncScreen = ({ onBack }: SyncScreenProps) => {
   };
 
   const merge = (matches: Match[]) => {
-    const { data, summary } = mergeState(local, matches);
-    replaceProgress(data);
-    setLocal(loadProgress()); // re-read: the QR now shows the merged state
-    setStep({ kind: "done", summary });
+    try {
+      const { data, summary } = mergeState(local, matches); // throws if anything would be lost
+      replaceProgress(data);
+      setLocal(loadProgress()); // re-read: the QR now shows the merged state
+      setStep({ kind: "done", summary });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "La synchronisation a échoué. Rien n'a été modifié.");
+      setStep({ kind: "show" });
+    }
+  };
+
+  // Preview of a merge, without saving (null if it would be refused).
+  const previewOf = (matches: Match[]) => {
+    try {
+      return mergeState(local, matches).summary;
+    } catch {
+      return null;
+    }
   };
 
   return (
@@ -169,7 +183,7 @@ const SyncScreen = ({ onBack }: SyncScreenProps) => {
           <div className="w-full max-w-md flex flex-col gap-3">
             <p className="font-display font-bold text-xl text-ink text-center">Ce qui va être ajouté</p>
             <ul className="flex flex-col gap-2">
-              {mergeState(local, step.matches).summary.map((s) => (
+              {(previewOf(step.matches) ?? []).map((s) => (
                 <li key={s.id} className="flex items-center gap-3 bg-white border-[3px] border-ink rounded-2xl px-3 py-2 font-display font-semibold text-ink">
                   <span className="text-3xl leading-none" aria-hidden>
                     {s.avatar}
@@ -184,7 +198,21 @@ const SyncScreen = ({ onBack }: SyncScreenProps) => {
                   </span>
                 </li>
               ))}
+              {step.matches
+                .filter((m) => m.target.kind === "ignore")
+                .map((m) => (
+                  <li key={`ignored-${m.remote.id}`} className="flex items-center gap-3 bg-white/60 border-2 border-dashed border-ink/30 rounded-2xl px-3 py-2 font-display font-semibold text-ink/70">
+                    <span className="text-3xl leading-none" aria-hidden>
+                      {m.remote.avatar}
+                    </span>
+                    <span className="flex-1 truncate">{m.remote.name || "Sans prénom"}</span>
+                    <span className="text-sm">ignoré · rien n'est retiré ici</span>
+                  </li>
+                ))}
             </ul>
+            <p className="text-xs font-body font-semibold text-muted-foreground text-center">
+              La synchronisation ne fait qu'ajouter : aucun autocollant ni brossage n'est jamais retiré.
+            </p>
             <Button variant="hero" size="lg" onClick={() => merge(step.matches)}>
               Fusionner
             </Button>

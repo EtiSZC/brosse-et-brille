@@ -202,6 +202,7 @@ const bySession = (a: Session, b: Session) => sessionKey(a).localeCompare(sessio
 export function mergeState(local: ProgressData, matches: Match[]): { data: ProgressData; summary: MergeSummaryItem[] } {
   const data: ProgressData = structuredClone(local);
   const summary: MergeSummaryItem[] = [];
+  const renames: Record<string, string> = {}; // local id → converged id
 
   for (const { remote, target } of matches) {
     if (target.kind === "ignore") continue;
@@ -217,6 +218,7 @@ export function mergeState(local: ProgressData, matches: Match[]): { data: Progr
     // Same child: both phones converge on the smaller id.
     const finalId = target.id < remote.id ? target.id : remote.id;
     if (finalId !== target.id) {
+      renames[target.id] = finalId;
       data.profiles = data.profiles.map((p) => (p.id === target.id ? { ...p, id: finalId } : p));
       data.data[finalId] = data.data[target.id] ?? { sessions: [], stickers: [] };
       delete data.data[target.id];
@@ -233,5 +235,33 @@ export function mergeState(local: ProgressData, matches: Match[]): { data: Progr
     const meta = data.profiles.find((p) => p.id === finalId)!;
     summary.push({ id: finalId, name: meta.name, avatar: meta.avatar, isNew: false, addedSessions: newSessions.length, addedStickers: newStickers.length });
   }
+
+  // Safety net: a sync may only ever add. Refuse rather than save a smaller album or history.
+  const losses = findLosses(local, data, renames);
+  if (losses.length) throw new SyncLossError(losses);
   return { data, summary };
+}
+
+export class SyncLossError extends Error {
+  constructor(readonly losses: string[]) {
+    super("Synchronisation annulée : elle aurait retiré des autocollants ou des brossages. Rien n'a été modifié.");
+  }
+}
+
+/** What `after` would lose compared with `before` (empty = safe). `renames` maps ids changed by the merge. */
+export function findLosses(before: ProgressData, after: ProgressData, renames: Record<string, string> = {}): string[] {
+  const losses: string[] = [];
+  for (const p of before.profiles) {
+    const was = before.data[p.id] ?? { sessions: [], stickers: [] };
+    const now = after.data[renames[p.id] ?? p.id];
+    if (!now) {
+      if (was.sessions.length || was.stickers.length) losses.push(`${p.name || p.id}: profil disparu`);
+      continue;
+    }
+    for (const k of was.stickers) if (!now.stickers.includes(k)) losses.push(`${p.name || p.id}: autocollant ${k}`);
+    const kept = new Set(now.sessions.map(sessionKey));
+    for (const s of was.sessions)
+      if (!kept.has(sessionKey(s))) losses.push(`${p.name || p.id}: brossage ${s.date} ${s.slot === "morning" ? "matin" : "soir"}`);
+  }
+  return losses;
 }
