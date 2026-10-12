@@ -36,6 +36,19 @@ Built APKs are copied to `releases/` (git-ignored, kept locally) as `brosse-et-b
 
 Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capacitor/assets generate --android --iconBackgroundColor '#DFF7F0' --splashBackgroundColor '#DFF7F0'`. Fonts are bundled via `@fontsource` (no network needed at runtime).
 
+## PWA on GitHub Pages (iPhone testers) — branch `phase-8-pwa`
+
+Live at **https://etiszc.github.io/brosse-et-brille/** — open in **Safari** → Partager → « Sur l'écran d'accueil »; full-screen and offline after the first visit. Same link works on Android browsers.
+
+- **Deploy**: `.github/workflows/pages.yml` runs on every push to `phase-8-pwa` (npm ci → npm test → `PAGES_BASE=/brosse-et-brille/ npm run build` → deploy-pages). Pages source = GitHub Actions; the `github-pages` environment allows `main` and `phase-8-pwa`. Pushing a change to `.github/workflows/` needs the `workflow` scope: `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` (the keychain credential lacks it).
+- **Base path**: `vite.config.ts` uses `PAGES_BASE` only for Pages; every other build (dev, **Android/Capacitor**) keeps `/`. Router `basename = import.meta.env.BASE_URL`; `404.html` copied only in the Pages build.
+- **Offline**: workbox precaches js/css/html, Lily's 13 mp3, the 7 woff2 fonts, images and icons (`maximumFileSizeToCacheInBytes` 3 MB). Verified offline on the live site (reload + voice clip from cache).
+- **iPhone specifics**: `navigator.audioSession.type = "playback"` in `unlockAudio()` (silent switch doesn't mute), `viewport-fit=cover` + safe-area padding in `BathroomBackground`, apple-touch-icon / PWA icons in `public/` (generated from `assets/logo.png`), `navigator.storage.persist()` at start.
+- **QR sync in the browser**: `src/components/CameraScanner.tsx` (getUserMedia back camera + `jsqr`, only `BB1` codes, camera stopped on read/cancel); the Android app keeps ML Kit (`usesNativeScanner()` in `src/lib/scanner.ts`).
+- **Credit**: « Voix de Brillou : elevenlabs.io » in the parents area (free ElevenLabs plan, public repo → attribution required, non-commercial).
+- CI notices (2026-10): GitHub actions on Node 20 are forced to Node 24 (bump to v5 actions when available); `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19.
+- **Merge gate** before merging into `main`: all tests + Android regression on the Galaxy A55 + user's OK; then switch the workflow trigger to `main`.
+
 ## Brillou's voice (ElevenLabs)
 
 Clips are generated once and bundled (offline, nothing sent at runtime). Voice **Lily** (`pFZP5JQG7iQjIQuC4Bku`), model `eleven_multilingual_v2`, stability 0.45 / similarity 0.8 / style 0.35 — chosen by the user on 2026-10-07.
@@ -137,4 +150,5 @@ npm run android    # rebuild + reinstall on the phone
 5. ✅ **Child profiles** (done 2026-10-07, merged; validated on the phone) — up to 4 profiles (name + animal emoji), "Qui se brosse les dents ?" picker when ≥ 2, brushing together (each child gets their slot and sticker), per-child calendar/streak/album, parents screen behind a 2 s long press. Names shown on screen, never spoken or sent anywhere.
 6. ✅ **Music mode** (done 2026-10-07, merged; validated on the phone) — synthesized cheerful loop synced to the steps, on by default (🎵 toggle), ducks under Brillou's voice. ElevenLabs Music was tried first but its API needs a paid plan.
 7. ✅ **Two-phone sync** (done 2026-10-11, merged; real scan validated on the Galaxy A55 — QR shown on the Mac, "déjà à jour") — QR code both ways from the parents area, offline, no backend; union merge so no sticker or brushing is ever lost.
-8. **Later** — Brillou poses (needs illustration), parent corner with history/tips, optional local reminders, signed release build for Google Play (+ paid ElevenLabs plan and regenerated clips for commercial use).
+8. 🔄 **PWA for iPhone testers** (2026-10-12, branch `phase-8-pwa`, live on GitHub Pages; awaiting iPhone test + Android regression before merge).
+9. **Later** — Brillou poses (needs illustration), parent corner with history/tips, optional local reminders, signed release build for Google Play (+ paid ElevenLabs plan and regenerated clips for commercial use).
