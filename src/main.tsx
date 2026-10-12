@@ -10,4 +10,7 @@ import "@fontsource/nunito/latin-700.css";
 import "@fontsource/nunito/latin-600-italic.css";
 import "./index.css";
 
+// Ask the browser to keep the history and stickers (no eviction under storage pressure).
+navigator.storage?.persist?.().catch(() => {});
+
 createRoot(document.getElementById("root")!).render(<App />);

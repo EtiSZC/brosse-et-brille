@@ -139,6 +139,10 @@ const ParentsScreen = ({ onBack, onSync }: ParentsScreenProps) => {
             Synchroniser avec un autre téléphone
           </Button>
         </div>
+
+        <p className="w-full max-w-md text-xs font-body font-semibold text-muted-foreground text-center">
+          Voix de Brillou : elevenlabs.io
+        </p>
       </div>
     </BathroomBackground>
   );

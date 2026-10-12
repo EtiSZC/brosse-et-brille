@@ -5,7 +5,19 @@ import ParentsScreen from "./ParentsScreen";
 import { addProfile, getProfile, listProfiles, recordSession, type ProgressData } from "@/lib/progress";
 import { encodeState } from "@/lib/sync";
 
-vi.mock("@/lib/scanner", () => ({ canScan: () => false, scanQr: vi.fn() }));
+const scannerMode = vi.hoisted(() => ({ camera: false }));
+vi.mock("@/lib/scanner", () => ({
+  canScan: () => scannerMode.camera,
+  usesNativeScanner: () => false,
+  scanQr: vi.fn(),
+}));
+// Stand-in for the in-browser camera: a button that "reads" whatever code the test provides.
+const cameraCode = vi.hoisted(() => ({ text: "" }));
+vi.mock("@/components/CameraScanner", () => ({
+  default: ({ onResult }: { onResult: (t: string) => void }) => (
+    <button onClick={() => onResult(cameraCode.text)}>caméra simulée</button>
+  ),
+}));
 
 const otherPhone = (profiles: { id: string; name: string; avatar: string; stickers: string[]; sessions: { date: string; slot: "morning" | "evening" }[] }[]): string => {
   const data: ProgressData = {
@@ -24,6 +36,7 @@ const paste = (code: string) => {
 describe("sync screen", () => {
   let leaId: string;
   beforeEach(() => {
+    scannerMode.camera = false;
     localStorage.clear();
     leaId = addProfile("Léa", "🦊")!.id;
     recordSession(new Date(2026, 9, 10, 8), leaId, () => 0); // unicorn
@@ -103,5 +116,15 @@ describe("sync screen", () => {
     render(<ParentsScreen onBack={() => {}} onSync={onSync} />);
     fireEvent.click(screen.getByRole("button", { name: "Synchroniser avec un autre téléphone" }));
     expect(onSync).toHaveBeenCalled();
+  });
+
+  it("in a browser with a camera (PWA): scans through the in-page camera", () => {
+    scannerMode.camera = true;
+    cameraCode.text = otherPhone([{ id: "px", name: "Zoé", avatar: "🐰", stickers: ["bee"], sessions: [] }]);
+    render(<SyncScreen onBack={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /Scanner l'autre téléphone/ }));
+    fireEvent.click(screen.getByRole("button", { name: "caméra simulée" }));
+    expect(screen.queryByRole("button", { name: "caméra simulée" })).not.toBeInTheDocument(); // camera closed
+    expect(screen.getByText("Qui est qui ?")).toBeInTheDocument();
   });
 });
