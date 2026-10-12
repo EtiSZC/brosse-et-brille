@@ -16,7 +16,8 @@ const App = () => (
       <Sonner />
       {/* Honour the OS "reduce motion" setting for all framer-motion animations */}
       <MotionConfig reducedMotion="user">
-        <BrowserRouter>
+        {/* BASE_URL is "/" except in the GitHub Pages build (served under a sub-path) */}
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Routes>
             <Route path="/" element={<Index />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
