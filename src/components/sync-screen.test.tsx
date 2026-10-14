@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import SyncScreen from "./SyncScreen";
 import ParentsScreen from "./ParentsScreen";
-import { addProfile, getProfile, listProfiles, recordSession, type ProgressData } from "@/lib/progress";
+import { addProfile, getProfile, listProfiles, recordSession, replaceProgress, type ProgressData } from "@/lib/progress";
 import { encodeState } from "@/lib/sync";
 
 vi.mock("@/lib/scanner", () => ({ canScan: () => false, scanQr: vi.fn() }));
@@ -105,5 +105,20 @@ describe("sync screen", () => {
     render(<ParentsScreen onBack={() => {}} onSync={onSync} />);
     fireEvent.click(screen.getByRole("button", { name: "Synchroniser avec un autre téléphone" }));
     expect(onSync).toHaveBeenCalled();
+  });
+
+  it("parents area: repair card folds a 'Moi' holding Léa's stickers into Léa, losing nothing", () => {
+    replaceProgress({
+      version: 2,
+      profiles: [{ id: "pMoi", name: "", avatar: "🐸" }, { id: "pLea", name: "Léa", avatar: "🦊" }],
+      data: { pMoi: { sessions: [], stickers: ["unicorn", "rocket"] }, pLea: { sessions: [], stickers: [] } },
+      active: ["pLea"],
+    });
+    render(<ParentsScreen onBack={() => {}} onSync={() => {}} />);
+    expect(screen.getByText(/« Moi » contient 2 autocollants/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /C'est 🦊 Léa/ }));
+    expect(listProfiles().map((p) => p.name)).toEqual(["Léa"]);
+    expect(getProfile("pLea").stickers.sort()).toEqual(["rocket", "unicorn"]);
+    expect(screen.queryByRole("region", { name: "Profil en double" })).not.toBeInTheDocument();
   });
 });

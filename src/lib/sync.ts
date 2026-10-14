@@ -10,6 +10,7 @@ import {
   toDay,
   unionHistory,
   type ProfileData,
+  type ProfileMeta,
   type ProgressData,
   type Session,
 } from "./progress";
@@ -297,4 +298,60 @@ export function findLosses(before: ProgressData, after: ProgressData, renames: R
       if (!kept.has(sessionKey(s))) losses.push(`${p.name || p.id}: brossage ${s.date} ${s.slot === "morning" ? "matin" : "soir"}`);
   }
   return losses;
+}
+
+// ---------------------------------------------------------------------------
+// Repair: two profiles that are probably the same child
+// ---------------------------------------------------------------------------
+
+export interface SameChildSuggestion {
+  /** The profile to fold into one of the candidates. */
+  other: ProfileMeta;
+  /** Who it probably is (one for a same-name pair, every named child for an unnamed one). */
+  candidates: ProfileMeta[];
+  reason: "same-name" | "unnamed-with-data";
+}
+
+const DISMISSED_KEY = "brosse-brille:same-child-dismissed";
+
+function readDismissed(): string[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "[]");
+    return Array.isArray(list) ? list.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** "Non, ce sont deux enfants": never suggest this profile again. */
+export function dismissSameChild(otherId: string) {
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...new Set([...readDismissed(), otherId])]));
+  } catch {
+    // Storage unavailable: the suggestion just comes back next time.
+  }
+}
+
+/**
+ * Profiles left by the old sync bug: the same first name twice, or an unnamed "Moi" holding a
+ * child's stickers/brushings next to named children. Merging them (`mergeProfiles`) loses nothing.
+ */
+export function suggestSameChild(data: ProgressData, dismissed: string[] = readDismissed()): SameChildSuggestion[] {
+  const suggestions: SameChildSuggestion[] = [];
+  const named = data.profiles.filter((p) => p.name);
+  const firstByName = new Map<string, ProfileMeta>();
+  for (const p of named) {
+    const key = normalizeName(p.name);
+    const first = firstByName.get(key);
+    if (!first) firstByName.set(key, p);
+    else if (!dismissed.includes(p.id)) suggestions.push({ other: p, candidates: [first], reason: "same-name" });
+  }
+  for (const p of data.profiles) {
+    const history = data.data[p.id];
+    const hasData = !!history && (history.sessions.length > 0 || history.stickers.length > 0);
+    if (!p.name && hasData && named.length && !dismissed.includes(p.id)) {
+      suggestions.push({ other: p, candidates: named, reason: "unnamed-with-data" });
+    }
+  }
+  return suggestions;
 }

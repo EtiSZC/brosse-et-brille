@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { STICKERS, getProfile, recordSession, replaceProgress, toDay, type ProgressData, type Session } from "./progress";
-import { SYNC_PREFIX, decodeState, encodeState, findLosses, mergeState, normalizeName, suggestMatches } from "./sync";
+import { STICKERS, getProfile, loadProgress, mergeProfiles, recordSession, replaceProgress, toDay, type ProgressData, type Session } from "./progress";
+import { SYNC_PREFIX, decodeState, encodeState, findLosses, mergeState, normalizeName, suggestMatches, suggestSameChild } from "./sync";
 
 const NOW = new Date(2026, 9, 11, 9);
 const day = (offset: number) => {
@@ -196,5 +196,103 @@ describe("sticker safety (a sync never loses a sticker)", () => {
     const renamed = lea("pa", ["unicorn", "lion"], [{ date: day(-1), slot: "evening" }]);
     expect(findLosses(before, renamed, { pb: "pa" })).toEqual([]);
     expect(findLosses(before, renamed)).toEqual(["Léa: profil disparu"]);
+  });
+});
+
+describe("each child keeps their own album (fix 2026-10-14)", () => {
+  type Kid = { id: string; name: string; avatar?: string; stickers: string[]; sessions?: Session[] };
+  const phone = (kids: Kid[]): ProgressData => state(kids);
+  /** Albums by child name (sorted), as a parent sees them; "Moi" for an unnamed profile. */
+  const albums = (d: ProgressData) =>
+    Object.fromEntries(d.profiles.map((p) => [p.name || "Moi", [...d.data[p.id].stickers].sort()]));
+  const ids = (d: ProgressData) => d.profiles.map((p) => p.id);
+  /** Like the app: a child never earns a sticker they already have. */
+  const add = (d: ProgressData, name: string, sticker: string) => {
+    const album = d.data[d.profiles.find((p) => p.name === name)!.id].stickers;
+    if (!album.includes(sticker)) album.push(sticker);
+  };
+
+  it("children created on one phone: on both phones, each child has exactly their own stickers", () => {
+    // Today's installs: the first profile is "default" on both phones.
+    let a = phone([{ id: "default", name: "Léa", stickers: ["unicorn", "rocket"] }, { id: "pTomA", name: "Tom", avatar: "🐼", stickers: ["lion"] }]);
+    let b = phone([{ id: "default", name: "", avatar: "🐸", stickers: [] }]); // fresh install
+    b = sync(b, a);
+    a = sync(a, b);
+    for (const d of [a, b]) expect(albums(d)).toEqual({ Léa: ["rocket", "unicorn"], Tom: ["lion"] });
+    expect(b.profiles.map((p) => `${p.avatar} ${p.name}`)).toEqual(["🦊 Léa", "🐼 Tom"]); // names and avatars arrive
+
+    // Each phone earns new stickers, then a second round both ways.
+    add(b, "Léa", "fox");
+    add(b, "Tom", "bee");
+    add(a, "Tom", "whale");
+    b = sync(b, a);
+    a = sync(a, b);
+    for (const d of [a, b]) expect(albums(d)).toEqual({ Léa: ["fox", "rocket", "unicorn"], Tom: ["bee", "lion", "whale"] });
+    for (const d of [a, b]) expect(new Set(ids(d)).size).toBe(d.profiles.length);
+  });
+
+  it("two installs whose 'default' profiles are different children are never mixed up", () => {
+    const a = phone([{ id: "default", name: "Léa", stickers: ["unicorn"] }, { id: "pTomA", name: "Tom", stickers: ["lion"] }]);
+    const b = phone([{ id: "default", name: "Tom", stickers: ["bee"] }]);
+    const b1 = sync(b, a);
+    expect(albums(b1)).toEqual({ Tom: ["bee", "lion"], Léa: ["unicorn"] });
+  });
+
+  it("a phone still on the old version (sending 'default') is matched by name, and nobody is renamed 'default'", () => {
+    const local = phone([{ id: "pLea", name: "Léa", stickers: ["unicorn"] }]);
+    const legacy = phone([{ id: "default", name: "Léa", stickers: ["fox"] }]);
+    const merged = sync(local, legacy);
+    expect(ids(merged)).toEqual(["pLea"]);
+    expect(albums(merged)).toEqual({ Léa: ["fox", "unicorn"] });
+  });
+
+  it("a manual pairing can never make two children share one album", () => {
+    const local = phone([{ id: "pZ", name: "Léa", stickers: ["unicorn"] }, { id: "pA", name: "Tom", stickers: ["lion"] }]);
+    const remoteLea = decode(encodeState(phone([{ id: "pA", name: "Léa", stickers: ["fox"] }]), NOW))[0];
+    const { data } = mergeState(local, [{ remote: remoteLea, target: { kind: "local", id: "pZ" } }]);
+    expect(new Set(ids(data)).size).toBe(2);
+    expect(albums(data)).toEqual({ Léa: ["fox", "unicorn"], Tom: ["lion"] });
+  });
+
+  it("4 children, several rounds both ways, stickers earned on both phones: each album is that child's union", () => {
+    const names = ["Léa", "Tom", "Zoé", "Noé"];
+    let a = phone(names.map((n, i) => ({ id: i ? `pa${i}` : "default", name: n, stickers: [STICKERS[i].id] })));
+    let b = phone([{ id: "default", name: "", stickers: [] }]);
+    const expected: Record<string, Set<string>> = Object.fromEntries(names.map((n, i) => [n, new Set([STICKERS[i].id])]));
+    for (let round = 0; round < 3; round++) {
+      b = sync(b, a);
+      a = sync(a, b);
+      names.forEach((n, i) => {
+        const fromA = STICKERS[(4 + round * 8 + i) % STICKERS.length].id;
+        const fromB = STICKERS[(8 + round * 8 + i) % STICKERS.length].id;
+        add(a, n, fromA);
+        add(b, n, fromB);
+        expected[n].add(fromA).add(fromB);
+      });
+    }
+    b = sync(b, a);
+    a = sync(a, b);
+    const want = Object.fromEntries(names.map((n) => [n, [...expected[n]].sort()]));
+    for (const d of [a, b]) expect(albums(d)).toEqual(want);
+  });
+
+  it("repair: a 'Moi' holding Léa's stickers next to a hand-made 'Léa' is suggested, merged, and Léa gets her next stickers", () => {
+    replaceProgress(phone([{ id: "pMoi", name: "", stickers: ["unicorn", "rocket"] }, { id: "pLea", name: "Léa", stickers: [] }, { id: "pTom", name: "Tom", stickers: ["lion"] }]));
+    const [sg] = suggestSameChild(loadProgress(), []);
+    expect(sg).toMatchObject({ reason: "unnamed-with-data", other: { id: "pMoi" } });
+    expect(sg.candidates.map((c) => c.name)).toEqual(["Léa", "Tom"]);
+    mergeProfiles("pLea", "pMoi");
+    expect(albums(loadProgress())).toEqual({ Léa: ["rocket", "unicorn"], Tom: ["lion"] });
+
+    const other = phone([{ id: "pX", name: "Léa", stickers: ["fox"] }, { id: "pY", name: "Tom", stickers: [] }]);
+    const merged = sync(loadProgress(), other);
+    expect(albums(merged)).toEqual({ Léa: ["fox", "rocket", "unicorn"], Tom: ["lion"] });
+    expect(suggestSameChild(merged, [])).toEqual([]);
+  });
+
+  it("suggests same-name duplicates, and 'Non' hides the suggestion", () => {
+    const d = phone([{ id: "p1", name: "Léa", stickers: [] }, { id: "p2", name: " lea ", stickers: ["fox"] }]);
+    expect(suggestSameChild(d, []).map((x) => [x.reason, x.other.id, x.candidates[0].id])).toEqual([["same-name", "p2", "p1"]]);
+    expect(suggestSameChild(d, ["p2"])).toEqual([]);
   });
 });

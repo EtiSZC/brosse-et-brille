@@ -76,4 +76,32 @@ describe("child profiles", () => {
     deleteProfile(tom.id);
     expect(getActiveProfiles()).toHaveLength(1); // falls back to the remaining profile
   });
+
+  it("gives a stored 'default' profile a unique id once, keeping its history, album and active selection", () => {
+    localStorage.setItem("brosse-brille:progress:v2", JSON.stringify({
+      version: 2,
+      profiles: [{ id: "default", name: "Léa", avatar: "🦊" }, { id: "pTom", name: "Tom", avatar: "🐼" }],
+      data: { default: { sessions: [{ date: "2026-10-07", slot: "morning" }], stickers: ["unicorn"] }, pTom: { sessions: [], stickers: ["lion"] } },
+      active: ["default"],
+    }));
+    const [lea, tom] = listProfiles();
+    expect(lea.id).not.toBe("default");
+    expect(listProfiles()[0].id).toBe(lea.id); // saved: same id on every read
+    expect(getProfile(lea.id)).toEqual({ sessions: [{ date: "2026-10-07", slot: "morning" }], stickers: ["unicorn"] });
+    expect(getActiveProfiles().map((p) => p.name)).toEqual(["Léa"]);
+    expect(getProfile(tom.id).stickers).toEqual(["lion"]);
+  });
+
+  it("splits two profiles sharing one id, each keeping a copy of the album (nothing lost)", () => {
+    localStorage.setItem("brosse-brille:progress:v2", JSON.stringify({
+      version: 2,
+      profiles: [{ id: "pSame", name: "Léa", avatar: "🦊" }, { id: "pSame", name: "Tom", avatar: "🐼" }],
+      data: { pSame: { sessions: [], stickers: ["unicorn", "lion"] } },
+      active: ["pSame"],
+    }));
+    const [a, b] = listProfiles();
+    expect(a.id).not.toBe(b.id);
+    expect(getProfile(a.id).stickers).toEqual(["unicorn", "lion"]);
+    expect(getProfile(b.id).stickers).toEqual(["unicorn", "lion"]);
+  });
 });

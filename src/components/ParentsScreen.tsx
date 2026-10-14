@@ -8,10 +8,13 @@ import {
   deleteProfile,
   getProfile,
   listProfiles,
+  loadProgress,
   updateProfile,
   type ProfileMeta,
 } from "@/lib/progress";
 import { cn } from "@/lib/utils";
+import { suggestSameChild } from "@/lib/sync";
+import SameChildCard from "@/components/SameChildCard";
 
 interface ParentsScreenProps {
   onBack: () => void;
@@ -23,7 +26,12 @@ interface ParentsScreenProps {
 const ParentsScreen = ({ onBack, onSync }: ParentsScreenProps) => {
   const [profiles, setProfiles] = useState<ProfileMeta[]>(listProfiles);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const refresh = () => setProfiles(listProfiles());
+  // Profiles left by the old sync bug (same name twice, or a "Moi" holding a child's stickers).
+  const [suggestions, setSuggestions] = useState(() => suggestSameChild(loadProgress()));
+  const refresh = () => {
+    setProfiles(listProfiles());
+    setSuggestions(suggestSameChild(loadProgress()));
+  };
 
   const add = () => {
     const used = new Set(profiles.map((p) => p.avatar));
@@ -48,6 +56,10 @@ const ParentsScreen = ({ onBack, onSync }: ParentsScreenProps) => {
           Un profil par enfant (jusqu'à {MAX_PROFILES}). Les prénoms et les autocollants restent sur ce téléphone.
         </p>
 
+        {suggestions.map((sg) => (
+          <SameChildCard key={sg.other.id} suggestion={sg} onChange={refresh} />
+        ))}
+
         <ul className="w-full max-w-md flex flex-col gap-3">
           {profiles.map((p) => {
             const stickers = getProfile(p.id).stickers.length;
@@ -62,6 +74,7 @@ const ParentsScreen = ({ onBack, onSync }: ParentsScreenProps) => {
                     onChange={(e) => {
                       updateProfile(p.id, { name: e.target.value });
                       setProfiles((list) => list.map((x) => (x.id === p.id ? { ...x, name: e.target.value } : x)));
+                      setSuggestions(suggestSameChild(loadProgress()));
                     }}
                     placeholder="Prénom ou surnom"
                     maxLength={20}

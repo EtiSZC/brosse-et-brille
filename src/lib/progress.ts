@@ -234,7 +234,7 @@ export function unionHistory(a: ProfileData, b: ProfileData): ProfileData {
   const sessions = [...a.sessions, ...b.sessions.filter((s) => !known.has(sessionKey(s)))].sort((x, y) =>
     sessionKey(x).localeCompare(sessionKey(y)),
   );
-  return { sessions, stickers: [...a.stickers, ...b.stickers.filter((k) => !a.stickers.includes(k))] };
+  return { sessions, stickers: [...new Set([...a.stickers, ...b.stickers])] }; // also drops any old duplicate
 }
 
 /**
