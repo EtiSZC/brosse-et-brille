@@ -34,7 +34,7 @@ describe("sync screen", () => {
     await waitFor(() => expect(screen.getByAltText("QR code de ce téléphone")).toHaveAttribute("src", expect.stringContaining("data:image/svg+xml")));
   });
 
-  it("first sync: match by name, add the new child, preview, merge, then show the updated code", async () => {
+  it("first sync: match by name, the new child takes over the empty 'Moi' profile, preview, merge, then show the updated code", async () => {
     render(<SyncScreen onBack={() => {}} />);
     paste(
       otherPhone([
@@ -44,7 +44,8 @@ describe("sync screen", () => {
     );
     expect(screen.getByText("Qui est qui ?")).toBeInTheDocument();
     expect(screen.getByLabelText("lea correspond à")).toHaveValue(`local:${leaId}`);
-    expect(screen.getByLabelText("Zoé correspond à")).toHaveValue("add");
+    const placeholderId = listProfiles().find((p) => !p.name)!.id; // fresh install's empty "Moi"
+    expect(screen.getByLabelText("Zoé correspond à")).toHaveValue(`local:${placeholderId}`);
 
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(screen.getByText("+1 brossage, +1 autocollant")).toBeInTheDocument();
@@ -53,8 +54,9 @@ describe("sync screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fusionner" }));
     expect(screen.getByText("✓ Synchronisé")).toBeInTheDocument();
     expect(screen.getByText(/À votre tour/)).toBeInTheDocument();
-    // The fresh install's unnamed default profile, Léa (matched, local name kept), Zoé (added).
-    expect(listProfiles().map((p) => p.name)).toEqual(["", "Léa", "Zoé"]);
+    // The empty "Moi" became Zoé (name + avatar from the other phone); Léa matched, local name kept. No leftover "Moi".
+    expect(listProfiles().map((p) => p.name)).toEqual(["Zoé", "Léa"]);
+    expect(getProfile(listProfiles().find((p) => p.name === "Zoé")!.id).stickers).toEqual(["bee"]);
     const lea = listProfiles().find((p) => p.name === "Léa")!;
     expect(getProfile(lea.id).stickers.sort()).toEqual(["rocket", "unicorn"]);
     expect(listProfiles().some((p) => p.name === "Zoé")).toBe(true);

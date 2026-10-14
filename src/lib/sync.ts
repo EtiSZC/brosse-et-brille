@@ -3,9 +3,12 @@
 // stickers are never removed), so syncing both ways makes the phones identical.
 import {
   AVATARS,
+  DEFAULT_PROFILE,
   MAX_PROFILES,
   STICKERS,
+  newProfileId,
   toDay,
+  unionHistory,
   type ProfileData,
   type ProgressData,
   type Session,
@@ -160,29 +163,48 @@ export interface Match {
   target: MatchTarget;
 }
 
-/** Default matching: same id (already synced before), else same name, else add if there is room. */
+/**
+ * Default matching, in two passes so a weak guess never steals a better match:
+ * 1. same id (already synced before) — only if the names agree or the local profile has no
+ *    name (ids used to be shared by every install: "default"), then same name;
+ * 2. for the rest: take over an empty, unnamed local profile (a fresh install's "Moi"),
+ *    else add if there is room, else ignore.
+ */
 export function suggestMatches(local: ProgressData, remote: RemoteProfile[]): Match[] {
   const taken = new Set<string>();
+  const targets = new Map<string, MatchTarget>();
+  const sameName = (a: string, b: string) => normalizeName(a) === normalizeName(b);
+  const isEmpty = (id: string) => !local.data[id]?.sessions.length && !local.data[id]?.stickers.length;
+
+  for (const r of remote) {
+    const byId = local.profiles.find((p) => p.id === r.id && (!p.name || !r.name || sameName(p.name, r.name)));
+    if (byId) {
+      taken.add(byId.id);
+      targets.set(r.id, { kind: "local", id: byId.id });
+    }
+  }
+  for (const r of remote) {
+    if (targets.has(r.id) || !r.name) continue;
+    const byName = local.profiles.find((p) => !taken.has(p.id) && p.name && sameName(p.name, r.name));
+    if (byName) {
+      taken.add(byName.id);
+      targets.set(r.id, { kind: "local", id: byName.id });
+    }
+  }
   let room = MAX_PROFILES - local.profiles.length;
-  const pick = (r: RemoteProfile): MatchTarget => {
-    const byId = local.profiles.find((p) => p.id === r.id && !taken.has(p.id));
-    const byName = local.profiles.find(
-      (p) => !taken.has(p.id) && p.name && normalizeName(p.name) === normalizeName(r.name),
-    );
-    const found = byId ?? byName;
-    if (found) {
-      taken.add(found.id);
-      return { kind: "local", id: found.id };
-    }
-    if (room > 0) {
+  for (const r of remote) {
+    if (targets.has(r.id)) continue;
+    const placeholder = local.profiles.find((p) => !taken.has(p.id) && !p.name && isEmpty(p.id));
+    if (placeholder) {
+      taken.add(placeholder.id);
+      targets.set(r.id, { kind: "local", id: placeholder.id });
+    } else if (room > 0) {
       room--;
-      return { kind: "add" };
+      targets.set(r.id, { kind: "add" });
+    } else {
+      targets.set(r.id, { kind: "ignore" });
     }
-    return { kind: "ignore" };
-  };
-  // Id matches first, so a name match can't steal an already-synced child.
-  const byIdFirst = [...remote].sort((a, b) => Number(!local.profiles.some((p) => p.id === b.id)) - Number(!local.profiles.some((p) => p.id === a.id)));
-  const targets = new Map(byIdFirst.map((r) => [r.id, pick(r)]));
+  }
   return remote.map((r) => ({ remote: r, target: targets.get(r.id)! }));
 }
 
@@ -196,7 +218,6 @@ export interface MergeSummaryItem {
 }
 
 const sessionKey = (s: Session) => `${s.date}|${s.slot}`;
-const bySession = (a: Session, b: Session) => sessionKey(a).localeCompare(sessionKey(b));
 
 /** Union merge (never removes anything). Returns a new state; `local` is not modified. */
 export function mergeState(local: ProgressData, matches: Match[]): { data: ProgressData; summary: MergeSummaryItem[] } {
@@ -208,15 +229,21 @@ export function mergeState(local: ProgressData, matches: Match[]): { data: Progr
     if (target.kind === "ignore") continue;
 
     if (target.kind === "add") {
-      if (data.profiles.length >= MAX_PROFILES || data.profiles.some((p) => p.id === remote.id)) continue;
-      data.profiles.push({ id: remote.id, name: remote.name, avatar: remote.avatar });
-      data.data[remote.id] = { sessions: [...remote.sessions].sort(bySession), stickers: [...remote.stickers] };
-      summary.push({ id: remote.id, name: remote.name, avatar: remote.avatar, isNew: true, addedSessions: remote.sessions.length, addedStickers: remote.stickers.length });
+      if (data.profiles.length >= MAX_PROFILES) continue;
+      // Keep the other phone's id (so the next sync matches by id) unless it is already used here.
+      const id = remote.id === DEFAULT_PROFILE || data.profiles.some((p) => p.id === remote.id) ? newProfileId() : remote.id;
+      data.profiles.push({ id, name: remote.name, avatar: remote.avatar });
+      data.data[id] = unionHistory({ sessions: [], stickers: [] }, remote);
+      summary.push({ id, name: remote.name, avatar: remote.avatar, isNew: true, addedSessions: remote.sessions.length, addedStickers: remote.stickers.length });
       continue;
     }
 
-    // Same child: both phones converge on the smaller id.
-    const finalId = target.id < remote.id ? target.id : remote.id;
+    // Same child: both phones converge on the smaller id — but never onto an id another local
+    // child already uses (that would make two children share one album), nor onto the legacy
+    // shared "default".
+    const smaller = target.id < remote.id ? target.id : remote.id;
+    const usedElsewhere = data.profiles.some((p) => p.id === smaller && p.id !== target.id);
+    const finalId = smaller === DEFAULT_PROFILE || usedElsewhere ? target.id : smaller;
     if (finalId !== target.id) {
       renames[target.id] = finalId;
       data.profiles = data.profiles.map((p) => (p.id === target.id ? { ...p, id: finalId } : p));
@@ -225,15 +252,19 @@ export function mergeState(local: ProgressData, matches: Match[]): { data: Progr
       data.active = data.active.map((id) => (id === target.id ? finalId : id));
     }
     const mine = data.data[finalId] ?? { sessions: [], stickers: [] };
-    const known = new Set(mine.sessions.map(sessionKey));
-    const newSessions = remote.sessions.filter((s) => !known.has(sessionKey(s)));
-    const newStickers = remote.stickers.filter((s) => !mine.stickers.includes(s));
-    data.data[finalId] = {
-      sessions: [...mine.sessions, ...newSessions].sort(bySession),
-      stickers: [...mine.stickers, ...newStickers],
-    };
+    const merged = unionHistory(mine, remote);
+    data.data[finalId] = merged;
+    const newSessions = merged.sessions.length - mine.sessions.length;
+    const newStickers = merged.stickers.length - mine.stickers.length;
+    // A profile with no name here (a fresh install's "Moi") takes the child's name and avatar.
     const meta = data.profiles.find((p) => p.id === finalId)!;
-    summary.push({ id: finalId, name: meta.name, avatar: meta.avatar, isNew: false, addedSessions: newSessions.length, addedStickers: newStickers.length });
+    // Taking over an empty, unnamed profile = the child is new on this phone.
+    const isNew = !meta.name && !mine.sessions.length && !mine.stickers.length;
+    if (!meta.name && remote.name) {
+      meta.name = remote.name;
+      meta.avatar = remote.avatar;
+    }
+    summary.push({ id: finalId, name: meta.name, avatar: meta.avatar, isNew, addedSessions: newSessions, addedStickers: newStickers });
   }
 
   // Safety net: a sync may only ever add. Refuse rather than save a smaller album or history.
@@ -251,6 +282,8 @@ export class SyncLossError extends Error {
 /** What `after` would lose compared with `before` (empty = safe). `renames` maps ids changed by the merge. */
 export function findLosses(before: ProgressData, after: ProgressData, renames: Record<string, string> = {}): string[] {
   const losses: string[] = [];
+  const ids = after.profiles.map((p) => p.id);
+  if (new Set(ids).size !== ids.length) losses.push("deux profils partageraient le même album");
   for (const p of before.profiles) {
     const was = before.data[p.id] ?? { sessions: [], stickers: [] };
     const now = after.data[renames[p.id] ?? p.id];

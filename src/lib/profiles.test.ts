@@ -23,7 +23,9 @@ describe("child profiles", () => {
     const v1 = { version: 1, profiles: { default: { sessions: [{ date: "2026-10-07", slot: "morning" }], stickers: ["unicorn"] } } };
     localStorage.setItem(V1, JSON.stringify(v1));
     const [first] = listProfiles();
-    expect(first).toMatchObject({ id: "default", name: "", avatar: AVATARS[0] });
+    expect(first).toMatchObject({ name: "", avatar: AVATARS[0] });
+    expect(first.id).toMatch(/^p[0-9a-z]+$/); // unique per install, never the old shared "default"
+    expect(listProfiles()[0].id).toBe(first.id); // the new id is saved: stable across reads
     expect(getProfile(first.id).stickers).toEqual(["unicorn"]);
     recordSession(at(7, 20)); // first write saves v2
     expect(JSON.parse(localStorage.getItem(V1)!)).toEqual(v1); // untouched for a rollback to v0.5
