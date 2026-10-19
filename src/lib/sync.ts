@@ -3,12 +3,18 @@
 // stickers are never removed), so syncing both ways makes the phones identical.
 import {
   AVATARS,
+  DEFAULT_PROFILE,
   MAX_PROFILES,
+  HALLOWEEN_STICKERS,
   STICKERS,
+  newProfileId,
   toDay,
+  unionHistory,
   type ProfileData,
+  type ProfileMeta,
   type ProgressData,
   type Session,
+  type Sticker,
 } from "./progress";
 
 export const SYNC_PREFIX = "BB1";
@@ -26,8 +32,10 @@ interface WireProfile {
   d: number;
   /** 2 bits per day (bit 0 = morning, bit 1 = evening), base64url */
   s: string;
-  /** sticker bitmask (bit n = STICKERS[n]) */
+  /** sticker bitmask (bit n = STICKERS[n]) — the 20 classics only: v0.8 phones refuse k ≥ 2^20 */
   k: number;
+  /** Halloween bitmask (bit n = HALLOWEEN_STICKERS[n]); sent only when non-zero, ignored by v0.8 phones */
+  h?: number;
 }
 
 interface WireState {
@@ -65,6 +73,11 @@ const fromBase64Url = (text: string) => {
 const asciiJson = (value: unknown) =>
   JSON.stringify(value).replace(/[\u007f-￿]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
+/** Bit n set when set[n] is among the ids. */
+const maskOf = (set: readonly Sticker[], ids: string[]) =>
+  set.reduce((mask, s, i) => (ids.includes(s.id) ? mask | (1 << i) : mask), 0);
+const idsOf = (set: readonly Sticker[], mask: number) => set.filter((_, i) => mask & (1 << i)).map((s) => s.id);
+
 function encodeProfile(id: string, name: string, avatar: string, history: ProfileData, fromDay: number): WireProfile {
   const days = history.sessions.map((s) => dayNumber(s.date)).filter((d) => d >= fromDay);
   const first = days.length ? Math.min(...days) : 0;
@@ -76,11 +89,10 @@ function encodeProfile(id: string, name: string, avatar: string, history: Profil
     const bit = (d - first) * 2 + (s.slot === "evening" ? 1 : 0);
     bytes[bit >> 3] |= 1 << (bit & 7);
   }
-  const k = history.stickers.reduce((mask, id) => {
-    const i = STICKERS.findIndex((s) => s.id === id);
-    return i >= 0 ? mask | (1 << i) : mask;
-  }, 0);
-  return { i: id, n: name, a: Math.max(0, AVATARS.indexOf(avatar)), d: first, s: toBase64Url(bytes), k };
+  const wire: WireProfile = { i: id, n: name, a: Math.max(0, AVATARS.indexOf(avatar)), d: first, s: toBase64Url(bytes), k: maskOf(STICKERS, history.stickers) };
+  const h = maskOf(HALLOWEEN_STICKERS, history.stickers);
+  if (h) wire.h = h;
+  return wire;
 }
 
 /** This phone's state as the text to put in the QR code. */
@@ -121,7 +133,8 @@ export function decodeState(text: string): DecodeResult {
       Number.isInteger(w.a) && w.a >= 0 && w.a < AVATARS.length &&
       Number.isInteger(w.d) && w.d >= 0 &&
       typeof w.s === "string" && /^[\w-]{0,1000}$/.test(w.s) &&
-      Number.isInteger(w.k) && w.k >= 0 && w.k < 2 ** STICKERS.length;
+      Number.isInteger(w.k) && w.k >= 0 && w.k < 2 ** STICKERS.length &&
+      (w.h === undefined || (Number.isInteger(w.h) && w.h >= 0 && w.h < 2 ** HALLOWEEN_STICKERS.length));
     if (!valid) return INVALID;
 
     const sessions: Session[] = [];
@@ -139,7 +152,7 @@ export function decodeState(text: string): DecodeResult {
         }
       }
     });
-    const stickers = STICKERS.filter((_, i) => w.k & (1 << i)).map((s) => s.id);
+    const stickers = [...idsOf(STICKERS, w.k), ...idsOf(HALLOWEEN_STICKERS, w.h ?? 0)];
     profiles.push({ id: w.i, name: w.n, avatar: AVATARS[w.a], sessions, stickers });
   }
   return { ok: true, profiles, error: "" };
@@ -160,29 +173,48 @@ export interface Match {
   target: MatchTarget;
 }
 
-/** Default matching: same id (already synced before), else same name, else add if there is room. */
+/**
+ * Default matching, in two passes so a weak guess never steals a better match:
+ * 1. same id (already synced before) — only if the names agree or the local profile has no
+ *    name (ids used to be shared by every install: "default"), then same name;
+ * 2. for the rest: take over an empty, unnamed local profile (a fresh install's "Moi"),
+ *    else add if there is room, else ignore.
+ */
 export function suggestMatches(local: ProgressData, remote: RemoteProfile[]): Match[] {
   const taken = new Set<string>();
+  const targets = new Map<string, MatchTarget>();
+  const sameName = (a: string, b: string) => normalizeName(a) === normalizeName(b);
+  const isEmpty = (id: string) => !local.data[id]?.sessions.length && !local.data[id]?.stickers.length;
+
+  for (const r of remote) {
+    const byId = local.profiles.find((p) => p.id === r.id && (!p.name || !r.name || sameName(p.name, r.name)));
+    if (byId) {
+      taken.add(byId.id);
+      targets.set(r.id, { kind: "local", id: byId.id });
+    }
+  }
+  for (const r of remote) {
+    if (targets.has(r.id) || !r.name) continue;
+    const byName = local.profiles.find((p) => !taken.has(p.id) && p.name && sameName(p.name, r.name));
+    if (byName) {
+      taken.add(byName.id);
+      targets.set(r.id, { kind: "local", id: byName.id });
+    }
+  }
   let room = MAX_PROFILES - local.profiles.length;
-  const pick = (r: RemoteProfile): MatchTarget => {
-    const byId = local.profiles.find((p) => p.id === r.id && !taken.has(p.id));
-    const byName = local.profiles.find(
-      (p) => !taken.has(p.id) && p.name && normalizeName(p.name) === normalizeName(r.name),
-    );
-    const found = byId ?? byName;
-    if (found) {
-      taken.add(found.id);
-      return { kind: "local", id: found.id };
-    }
-    if (room > 0) {
+  for (const r of remote) {
+    if (targets.has(r.id)) continue;
+    const placeholder = local.profiles.find((p) => !taken.has(p.id) && !p.name && isEmpty(p.id));
+    if (placeholder) {
+      taken.add(placeholder.id);
+      targets.set(r.id, { kind: "local", id: placeholder.id });
+    } else if (room > 0) {
       room--;
-      return { kind: "add" };
+      targets.set(r.id, { kind: "add" });
+    } else {
+      targets.set(r.id, { kind: "ignore" });
     }
-    return { kind: "ignore" };
-  };
-  // Id matches first, so a name match can't steal an already-synced child.
-  const byIdFirst = [...remote].sort((a, b) => Number(!local.profiles.some((p) => p.id === b.id)) - Number(!local.profiles.some((p) => p.id === a.id)));
-  const targets = new Map(byIdFirst.map((r) => [r.id, pick(r)]));
+  }
   return remote.map((r) => ({ remote: r, target: targets.get(r.id)! }));
 }
 
@@ -196,7 +228,6 @@ export interface MergeSummaryItem {
 }
 
 const sessionKey = (s: Session) => `${s.date}|${s.slot}`;
-const bySession = (a: Session, b: Session) => sessionKey(a).localeCompare(sessionKey(b));
 
 /** Union merge (never removes anything). Returns a new state; `local` is not modified. */
 export function mergeState(local: ProgressData, matches: Match[]): { data: ProgressData; summary: MergeSummaryItem[] } {
@@ -208,15 +239,21 @@ export function mergeState(local: ProgressData, matches: Match[]): { data: Progr
     if (target.kind === "ignore") continue;
 
     if (target.kind === "add") {
-      if (data.profiles.length >= MAX_PROFILES || data.profiles.some((p) => p.id === remote.id)) continue;
-      data.profiles.push({ id: remote.id, name: remote.name, avatar: remote.avatar });
-      data.data[remote.id] = { sessions: [...remote.sessions].sort(bySession), stickers: [...remote.stickers] };
-      summary.push({ id: remote.id, name: remote.name, avatar: remote.avatar, isNew: true, addedSessions: remote.sessions.length, addedStickers: remote.stickers.length });
+      if (data.profiles.length >= MAX_PROFILES) continue;
+      // Keep the other phone's id (so the next sync matches by id) unless it is already used here.
+      const id = remote.id === DEFAULT_PROFILE || data.profiles.some((p) => p.id === remote.id) ? newProfileId() : remote.id;
+      data.profiles.push({ id, name: remote.name, avatar: remote.avatar });
+      data.data[id] = unionHistory({ sessions: [], stickers: [] }, remote);
+      summary.push({ id, name: remote.name, avatar: remote.avatar, isNew: true, addedSessions: remote.sessions.length, addedStickers: remote.stickers.length });
       continue;
     }
 
-    // Same child: both phones converge on the smaller id.
-    const finalId = target.id < remote.id ? target.id : remote.id;
+    // Same child: both phones converge on the smaller id — but never onto an id another local
+    // child already uses (that would make two children share one album), nor onto the legacy
+    // shared "default".
+    const smaller = target.id < remote.id ? target.id : remote.id;
+    const usedElsewhere = data.profiles.some((p) => p.id === smaller && p.id !== target.id);
+    const finalId = smaller === DEFAULT_PROFILE || usedElsewhere ? target.id : smaller;
     if (finalId !== target.id) {
       renames[target.id] = finalId;
       data.profiles = data.profiles.map((p) => (p.id === target.id ? { ...p, id: finalId } : p));
@@ -225,15 +262,19 @@ export function mergeState(local: ProgressData, matches: Match[]): { data: Progr
       data.active = data.active.map((id) => (id === target.id ? finalId : id));
     }
     const mine = data.data[finalId] ?? { sessions: [], stickers: [] };
-    const known = new Set(mine.sessions.map(sessionKey));
-    const newSessions = remote.sessions.filter((s) => !known.has(sessionKey(s)));
-    const newStickers = remote.stickers.filter((s) => !mine.stickers.includes(s));
-    data.data[finalId] = {
-      sessions: [...mine.sessions, ...newSessions].sort(bySession),
-      stickers: [...mine.stickers, ...newStickers],
-    };
+    const merged = unionHistory(mine, remote);
+    data.data[finalId] = merged;
+    const newSessions = merged.sessions.length - mine.sessions.length;
+    const newStickers = merged.stickers.length - mine.stickers.length;
+    // A profile with no name here (a fresh install's "Moi") takes the child's name and avatar.
     const meta = data.profiles.find((p) => p.id === finalId)!;
-    summary.push({ id: finalId, name: meta.name, avatar: meta.avatar, isNew: false, addedSessions: newSessions.length, addedStickers: newStickers.length });
+    // Taking over an empty, unnamed profile = the child is new on this phone.
+    const isNew = !meta.name && !mine.sessions.length && !mine.stickers.length;
+    if (!meta.name && remote.name) {
+      meta.name = remote.name;
+      meta.avatar = remote.avatar;
+    }
+    summary.push({ id: finalId, name: meta.name, avatar: meta.avatar, isNew, addedSessions: newSessions, addedStickers: newStickers });
   }
 
   // Safety net: a sync may only ever add. Refuse rather than save a smaller album or history.
@@ -251,6 +292,8 @@ export class SyncLossError extends Error {
 /** What `after` would lose compared with `before` (empty = safe). `renames` maps ids changed by the merge. */
 export function findLosses(before: ProgressData, after: ProgressData, renames: Record<string, string> = {}): string[] {
   const losses: string[] = [];
+  const ids = after.profiles.map((p) => p.id);
+  if (new Set(ids).size !== ids.length) losses.push("deux profils partageraient le même album");
   for (const p of before.profiles) {
     const was = before.data[p.id] ?? { sessions: [], stickers: [] };
     const now = after.data[renames[p.id] ?? p.id];
@@ -264,4 +307,60 @@ export function findLosses(before: ProgressData, after: ProgressData, renames: R
       if (!kept.has(sessionKey(s))) losses.push(`${p.name || p.id}: brossage ${s.date} ${s.slot === "morning" ? "matin" : "soir"}`);
   }
   return losses;
+}
+
+// ---------------------------------------------------------------------------
+// Repair: two profiles that are probably the same child
+// ---------------------------------------------------------------------------
+
+export interface SameChildSuggestion {
+  /** The profile to fold into one of the candidates. */
+  other: ProfileMeta;
+  /** Who it probably is (one for a same-name pair, every named child for an unnamed one). */
+  candidates: ProfileMeta[];
+  reason: "same-name" | "unnamed-with-data";
+}
+
+const DISMISSED_KEY = "brosse-brille:same-child-dismissed";
+
+function readDismissed(): string[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "[]");
+    return Array.isArray(list) ? list.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** "Non, ce sont deux enfants": never suggest this profile again. */
+export function dismissSameChild(otherId: string) {
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...new Set([...readDismissed(), otherId])]));
+  } catch {
+    // Storage unavailable: the suggestion just comes back next time.
+  }
+}
+
+/**
+ * Profiles left by the old sync bug: the same first name twice, or an unnamed "Moi" holding a
+ * child's stickers/brushings next to named children. Merging them (`mergeProfiles`) loses nothing.
+ */
+export function suggestSameChild(data: ProgressData, dismissed: string[] = readDismissed()): SameChildSuggestion[] {
+  const suggestions: SameChildSuggestion[] = [];
+  const named = data.profiles.filter((p) => p.name);
+  const firstByName = new Map<string, ProfileMeta>();
+  for (const p of named) {
+    const key = normalizeName(p.name);
+    const first = firstByName.get(key);
+    if (!first) firstByName.set(key, p);
+    else if (!dismissed.includes(p.id)) suggestions.push({ other: p, candidates: [first], reason: "same-name" });
+  }
+  for (const p of data.profiles) {
+    const history = data.data[p.id];
+    const hasData = !!history && (history.sessions.length > 0 || history.stickers.length > 0);
+    if (!p.name && hasData && named.length && !dismissed.includes(p.id)) {
+      suggestions.push({ other: p, candidates: named, reason: "unnamed-with-data" });
+    }
+  }
+  return suggestions;
 }

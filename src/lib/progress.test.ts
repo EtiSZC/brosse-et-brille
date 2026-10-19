@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { STICKERS, getProfile, recordSession, slotOf, streakOf, weekOf, type Session } from "./progress";
+import { HALLOWEEN_STICKERS, STICKERS, getProfile, isHalloweenSeason, recordSession, slotOf, streakOf, weekOf, type Session } from "./progress";
 
 // Local-time dates (month is 0-based): Wednesday 7 October 2026.
 const at = (day: number, hour: number) => new Date(2026, 9, day, hour, 0);
@@ -62,5 +62,60 @@ describe("progress", () => {
   it("survives corrupted storage", () => {
     localStorage.setItem("brosse-brille:progress:v1", "{not json");
     expect(recordSession(at(7, 7), undefined, () => 0).newSticker).toEqual(STICKERS[0]);
+  });
+});
+
+describe("Halloween stickers (only during the season)", () => {
+  beforeEach(() => localStorage.clear());
+  const date = (month: number, day: number, hour = 8) => new Date(2026, month, day, hour);
+  const allClassics = () => {
+    for (let d = 1; d <= 10; d++) {
+      recordSession(date(8, d, 8)); // September: classics only
+      recordSession(date(8, d, 20));
+    }
+    expect(getProfile().stickers).toHaveLength(STICKERS.length);
+  };
+
+  it("the season runs from 15 October to 2 November, every year", () => {
+    expect(isHalloweenSeason(date(9, 14, 23))).toBe(false);
+    expect(isHalloweenSeason(date(9, 15, 0))).toBe(true);
+    expect(isHalloweenSeason(date(9, 31))).toBe(true);
+    expect(isHalloweenSeason(date(10, 2, 23))).toBe(true);
+    expect(isHalloweenSeason(date(10, 3, 0))).toBe(false);
+    expect(isHalloweenSeason(new Date(2027, 9, 20))).toBe(true);
+  });
+
+  it("a child with every classic gets a Halloween sticker in season, nothing after it", () => {
+    allClassics();
+    const october = recordSession(date(9, 20), undefined, () => 0);
+    expect(october.newSticker).toEqual(HALLOWEEN_STICKERS[0]);
+    expect(recordSession(date(10, 10)).newSticker).toBeNull();
+    expect(getProfile().stickers).toContain(HALLOWEEN_STICKERS[0].id); // kept after the season
+  });
+
+  it("in season, Halloween stickers come first, then the classics once all are won", () => {
+    for (let i = 0; i < HALLOWEEN_STICKERS.length; i++) {
+      const r = recordSession(date(9, 15 + Math.floor(i / 2), i % 2 ? 20 : 8));
+      expect(HALLOWEEN_STICKERS.some((h) => h.id === r.newSticker?.id)).toBe(true);
+    }
+    expect(new Set(getProfile().stickers).size).toBe(HALLOWEEN_STICKERS.length);
+    const next = recordSession(date(9, 31, 20));
+    expect(STICKERS.some((c) => c.id === next.newSticker?.id)).toBe(true);
+  });
+
+  it("outside the season only classics are drawn; once all 35 are won, nothing more", () => {
+    for (let i = 0; i < STICKERS.length; i++) {
+      const r = recordSession(date(8, 1 + Math.floor(i / 2), i % 2 ? 20 : 8));
+      expect(STICKERS.some((c) => c.id === r.newSticker?.id)).toBe(true);
+    }
+    for (let i = 0; i < HALLOWEEN_STICKERS.length; i++) recordSession(date(9, 15 + Math.floor(i / 2), i % 2 ? 20 : 8));
+    expect(getProfile().stickers).toHaveLength(STICKERS.length + HALLOWEEN_STICKERS.length);
+    expect(recordSession(date(10, 1, 20)).newSticker).toBeNull();
+  });
+
+  it("brushing twice in the same slot still earns a single sticker", () => {
+    recordSession(date(9, 20, 8));
+    expect(recordSession(date(9, 20, 9)).newSticker).toBeNull();
+    expect(getProfile().stickers).toHaveLength(1);
   });
 });
