@@ -67,7 +67,43 @@ export const STICKERS = [
   { id: "trophy", emoji: "🏆", name: "Trophée" },
 ] as const;
 
-export type Sticker = (typeof STICKERS)[number];
+/**
+ * Halloween batch: can only be won during the Halloween season (`isHalloweenSeason`),
+ * every year; once won, a sticker stays in the album forever. No sweets (tooth-brushing app).
+ */
+export const HALLOWEEN_STICKERS = [
+  { id: "pumpkin", emoji: "🎃", name: "Citrouille" },
+  { id: "ghost", emoji: "👻", name: "Fantôme" },
+  { id: "bat", emoji: "🦇", name: "Chauve-souris" },
+  { id: "witch", emoji: "🧙", name: "Sorcière" },
+  { id: "broom", emoji: "🧹", name: "Balai magique" },
+  { id: "blackcat", emoji: "🐈‍⬛", name: "Chat noir" },
+  { id: "owl", emoji: "🦉", name: "Hibou" },
+  { id: "moon", emoji: "🌕", name: "Pleine lune" },
+  { id: "crystal", emoji: "🔮", name: "Boule de cristal" },
+  { id: "web", emoji: "🕸️", name: "Toile d'araignée" },
+  { id: "vampire", emoji: "🧛", name: "Vampire" },
+  { id: "wand", emoji: "🪄", name: "Baguette magique" },
+  { id: "skull", emoji: "💀", name: "Crâne" },
+  { id: "zombie", emoji: "🧟", name: "Zombie" },
+  { id: "spider", emoji: "🕷️", name: "Araignée" },
+] as const;
+
+export const ALL_STICKERS = [...STICKERS, ...HALLOWEEN_STICKERS] as const;
+export type Sticker = (typeof ALL_STICKERS)[number];
+
+export type StickerSetId = "classic" | "halloween";
+/** The album's pages, in order. */
+export const STICKER_SETS: { id: StickerSetId; title: string; stickers: readonly Sticker[] }[] = [
+  { id: "classic", title: "Mes autocollants", stickers: STICKERS },
+  { id: "halloween", title: "Halloween", stickers: HALLOWEEN_STICKERS },
+];
+
+/** Halloween season: 15 October → 2 November (local date), every year. */
+export function isHalloweenSeason(now = new Date()): boolean {
+  const m = now.getMonth(), d = now.getDate();
+  return (m === 9 && d >= 15) || (m === 10 && d <= 2);
+}
 
 // ---------------------------------------------------------------------------
 // Dates (local time)
@@ -276,7 +312,8 @@ export interface SessionResult {
 
 /**
  * Record a completed 3-minute session. Brushing twice in the same slot counts once.
- * The sticker is drawn at random among those not earned yet (`random` is injectable for tests).
+ * The sticker is drawn at random among those not earned yet — Halloween ones first during the
+ * Halloween season, classics only outside it (`random` is injectable for tests).
  */
 export function recordSession(now = new Date(), profile?: string, random = Math.random): SessionResult {
   const data = loadProgress();
@@ -288,7 +325,10 @@ export function recordSession(now = new Date(), profile?: string, random = Math.
   let newSticker: Sticker | null = null;
   if (!alreadyFilled) {
     p.sessions.push(session);
-    const remaining = STICKERS.filter((s) => !p.stickers.includes(s.id));
+    // In season, Halloween stickers first (then the classics once all are won); otherwise classics only.
+    const notWon = (set: readonly Sticker[]) => set.filter((s) => !p.stickers.includes(s.id));
+    const spooky = isHalloweenSeason(now) ? notWon(HALLOWEEN_STICKERS) : [];
+    const remaining = spooky.length ? spooky : notWon(STICKERS);
     newSticker = remaining.length ? remaining[Math.floor(random() * remaining.length)] : null;
     if (newSticker) p.stickers.push(newSticker.id);
   }

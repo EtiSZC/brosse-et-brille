@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STICKERS, getProfile, loadProgress, mergeProfiles, recordSession, replaceProgress, toDay, type ProgressData, type Session } from "./progress";
+import { HALLOWEEN_STICKERS, STICKERS, getProfile, loadProgress, mergeProfiles, recordSession, replaceProgress, toDay, type ProgressData, type Session } from "./progress";
 import { SYNC_PREFIX, decodeState, encodeState, findLosses, mergeState, normalizeName, suggestMatches, suggestSameChild } from "./sync";
 
 const NOW = new Date(2026, 9, 11, 9);
@@ -294,5 +294,51 @@ describe("each child keeps their own album (fix 2026-10-14)", () => {
     const d = phone([{ id: "p1", name: "Léa", stickers: [] }, { id: "p2", name: " lea ", stickers: ["fox"] }]);
     expect(suggestSameChild(d, []).map((x) => [x.reason, x.other.id, x.candidates[0].id])).toEqual([["same-name", "p2", "p1"]]);
     expect(suggestSameChild(d, ["p2"])).toEqual([]);
+  });
+});
+
+describe("Halloween stickers travel in the QR (field h)", () => {
+  const H = HALLOWEEN_STICKERS.map((s) => s.id);
+  const C = STICKERS.map((s) => s.id);
+  const wire = (text: string) => JSON.parse(text.slice(SYNC_PREFIX.length));
+
+  it("round-trips classics in k and Halloween ones in h", () => {
+    const text = encodeState(state([{ id: "p1", name: "Léa", stickers: [C[0], H[0], H[14], C[19]] }]), NOW);
+    expect(wire(text).p[0]).toMatchObject({ k: 1 | (1 << 19), h: 1 | (1 << 14) });
+    expect([...decode(text)[0].stickers].sort()).toEqual([C[0], C[19], H[0], H[14]].sort());
+  });
+
+  it("leaves h out when a child has no Halloween sticker (same QR as v0.8)", () => {
+    expect(wire(encodeState(state([{ id: "p1", name: "Léa", stickers: [C[3]] }]), NOW)).p[0]).not.toHaveProperty("h");
+  });
+
+  it("still reads a code from an older phone, and refuses a broken h", () => {
+    const old = SYNC_PREFIX + JSON.stringify({ v: 1, p: [{ i: "p1", n: "Léa", a: 0, d: 0, s: "", k: 5 }] });
+    expect(decode(old)[0].stickers).toEqual([C[0], C[2]]);
+    for (const h of [-1, 1.5, 2 ** HALLOWEEN_STICKERS.length, "3"]) {
+      const bad = SYNC_PREFIX + JSON.stringify({ v: 1, p: [{ i: "p1", n: "Léa", a: 0, d: 0, s: "", k: 5, h }] });
+      expect(decodeState(bad).ok).toBe(false);
+    }
+  });
+
+  it("keeps the classic mask under 2^20 so v0.8 phones still accept the code", () => {
+    const text = encodeState(state([{ id: "p1", name: "Léa", stickers: [...C, ...H] }]), NOW);
+    expect(wire(text).p[0].k).toBe(2 ** STICKERS.length - 1);
+  });
+
+  it("two-way sync: each child keeps their own Halloween stickers, nothing lost", () => {
+    let a = state([
+      { id: "pA1", name: "Léa", stickers: [...C, H[0], H[1]] },
+      { id: "pA2", name: "Tom", stickers: [C[0], H[2]] },
+    ]);
+    let b = state([
+      { id: "pB1", name: "Léa", stickers: [C[1], H[3]] },
+      { id: "pB2", name: "Tom", stickers: [H[4], H[5]] },
+    ]);
+    b = sync(b, a);
+    a = sync(a, b);
+    expect(history(a)).toEqual(history(b));
+    expect(history(a)["lea"].k).toEqual([...C, H[0], H[1], H[3]].sort());
+    expect(history(a)["tom"].k).toEqual([C[0], H[2], H[4], H[5]].sort());
   });
 });

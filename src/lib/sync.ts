@@ -5,6 +5,7 @@ import {
   AVATARS,
   DEFAULT_PROFILE,
   MAX_PROFILES,
+  HALLOWEEN_STICKERS,
   STICKERS,
   newProfileId,
   toDay,
@@ -13,6 +14,7 @@ import {
   type ProfileMeta,
   type ProgressData,
   type Session,
+  type Sticker,
 } from "./progress";
 
 export const SYNC_PREFIX = "BB1";
@@ -30,8 +32,10 @@ interface WireProfile {
   d: number;
   /** 2 bits per day (bit 0 = morning, bit 1 = evening), base64url */
   s: string;
-  /** sticker bitmask (bit n = STICKERS[n]) */
+  /** sticker bitmask (bit n = STICKERS[n]) — the 20 classics only: v0.8 phones refuse k ≥ 2^20 */
   k: number;
+  /** Halloween bitmask (bit n = HALLOWEEN_STICKERS[n]); sent only when non-zero, ignored by v0.8 phones */
+  h?: number;
 }
 
 interface WireState {
@@ -69,6 +73,11 @@ const fromBase64Url = (text: string) => {
 const asciiJson = (value: unknown) =>
   JSON.stringify(value).replace(/[\u007f-￿]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
+/** Bit n set when set[n] is among the ids. */
+const maskOf = (set: readonly Sticker[], ids: string[]) =>
+  set.reduce((mask, s, i) => (ids.includes(s.id) ? mask | (1 << i) : mask), 0);
+const idsOf = (set: readonly Sticker[], mask: number) => set.filter((_, i) => mask & (1 << i)).map((s) => s.id);
+
 function encodeProfile(id: string, name: string, avatar: string, history: ProfileData, fromDay: number): WireProfile {
   const days = history.sessions.map((s) => dayNumber(s.date)).filter((d) => d >= fromDay);
   const first = days.length ? Math.min(...days) : 0;
@@ -80,11 +89,10 @@ function encodeProfile(id: string, name: string, avatar: string, history: Profil
     const bit = (d - first) * 2 + (s.slot === "evening" ? 1 : 0);
     bytes[bit >> 3] |= 1 << (bit & 7);
   }
-  const k = history.stickers.reduce((mask, id) => {
-    const i = STICKERS.findIndex((s) => s.id === id);
-    return i >= 0 ? mask | (1 << i) : mask;
-  }, 0);
-  return { i: id, n: name, a: Math.max(0, AVATARS.indexOf(avatar)), d: first, s: toBase64Url(bytes), k };
+  const wire: WireProfile = { i: id, n: name, a: Math.max(0, AVATARS.indexOf(avatar)), d: first, s: toBase64Url(bytes), k: maskOf(STICKERS, history.stickers) };
+  const h = maskOf(HALLOWEEN_STICKERS, history.stickers);
+  if (h) wire.h = h;
+  return wire;
 }
 
 /** This phone's state as the text to put in the QR code. */
@@ -125,7 +133,8 @@ export function decodeState(text: string): DecodeResult {
       Number.isInteger(w.a) && w.a >= 0 && w.a < AVATARS.length &&
       Number.isInteger(w.d) && w.d >= 0 &&
       typeof w.s === "string" && /^[\w-]{0,1000}$/.test(w.s) &&
-      Number.isInteger(w.k) && w.k >= 0 && w.k < 2 ** STICKERS.length;
+      Number.isInteger(w.k) && w.k >= 0 && w.k < 2 ** STICKERS.length &&
+      (w.h === undefined || (Number.isInteger(w.h) && w.h >= 0 && w.h < 2 ** HALLOWEEN_STICKERS.length));
     if (!valid) return INVALID;
 
     const sessions: Session[] = [];
@@ -143,7 +152,7 @@ export function decodeState(text: string): DecodeResult {
         }
       }
     });
-    const stickers = STICKERS.filter((_, i) => w.k & (1 << i)).map((s) => s.id);
+    const stickers = [...idsOf(STICKERS, w.k), ...idsOf(HALLOWEEN_STICKERS, w.h ?? 0)];
     profiles.push({ id: w.i, name: w.n, avatar: AVATARS[w.a], sessions, stickers });
   }
   return { ok: true, profiles, error: "" };

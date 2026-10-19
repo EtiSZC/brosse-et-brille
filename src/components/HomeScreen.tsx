@@ -7,7 +7,7 @@ import MuteButton from "@/components/MuteButton";
 import SpeechBubble from "@/components/SpeechBubble";
 import WeekCalendar from "@/components/WeekCalendar";
 import LongPressButton from "@/components/LongPressButton";
-import { STICKERS, displayName, getActiveProfiles, getProfile, listProfiles, streakOf, weekOf } from "@/lib/progress";
+import { ALL_STICKERS, displayName, getActiveProfiles, getProfile, listProfiles, isHalloweenSeason, streakOf, weekOf } from "@/lib/progress";
 import { playStartSound, unlockAudio } from "@/lib/sounds";
 
 interface HomeScreenProps {
@@ -58,7 +58,7 @@ const HomeScreen = ({ onStart, onAlbum, onSwitch, onParents }: HomeScreenProps) 
         <button
           onClick={onAlbum}
           className="absolute top-4 right-4 w-14 h-14 rounded-full bg-white/80 hover:bg-white border-[3px] border-ink/15 shadow-md flex items-center justify-center text-2xl"
-          aria-label={`Mon album : ${stickerCount} autocollants sur ${STICKERS.length}`}
+          aria-label={`Mon album : ${stickerCount} autocollants sur ${ALL_STICKERS.length}`}
         >
           📒
           {stickerCount > 0 && (
@@ -108,7 +108,7 @@ const HomeScreen = ({ onStart, onAlbum, onSwitch, onParents }: HomeScreenProps) 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25, duration: 0.5 }}
-          className="text-5xl sm:text-6xl font-display font-bold text-center mb-3 sticker-title"
+          className="relative text-5xl sm:text-6xl font-display font-bold text-center mb-3 sticker-title"
           aria-label={TITLE}
         >
           {TITLE.split("").map((char, i) => (
@@ -121,6 +121,11 @@ const HomeScreen = ({ onStart, onAlbum, onSwitch, onParents }: HomeScreenProps) 
               {char}
             </span>
           ))}
+          {isHalloweenSeason() && (
+            <span aria-hidden className="absolute -top-7 -right-3 text-4xl rotate-12">
+              🎃
+            </span>
+          )}
         </motion.h1>
 
         <motion.p
