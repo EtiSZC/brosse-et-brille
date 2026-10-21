@@ -67,7 +67,43 @@ export const STICKERS = [
   { id: "trophy", emoji: "🏆", name: "Trophée" },
 ] as const;
 
-export type Sticker = (typeof STICKERS)[number];
+/**
+ * Halloween batch: can only be won during the Halloween season (`isHalloweenSeason`),
+ * every year; once won, a sticker stays in the album forever. No sweets (tooth-brushing app).
+ */
+export const HALLOWEEN_STICKERS = [
+  { id: "pumpkin", emoji: "🎃", name: "Citrouille" },
+  { id: "ghost", emoji: "👻", name: "Fantôme" },
+  { id: "bat", emoji: "🦇", name: "Chauve-souris" },
+  { id: "witch", emoji: "🧙", name: "Sorcière" },
+  { id: "broom", emoji: "🧹", name: "Balai magique" },
+  { id: "blackcat", emoji: "🐈‍⬛", name: "Chat noir" },
+  { id: "owl", emoji: "🦉", name: "Hibou" },
+  { id: "moon", emoji: "🌕", name: "Pleine lune" },
+  { id: "crystal", emoji: "🔮", name: "Boule de cristal" },
+  { id: "web", emoji: "🕸️", name: "Toile d'araignée" },
+  { id: "vampire", emoji: "🧛", name: "Vampire" },
+  { id: "wand", emoji: "🪄", name: "Baguette magique" },
+  { id: "skull", emoji: "💀", name: "Crâne" },
+  { id: "zombie", emoji: "🧟", name: "Zombie" },
+  { id: "spider", emoji: "🕷️", name: "Araignée" },
+] as const;
+
+export const ALL_STICKERS = [...STICKERS, ...HALLOWEEN_STICKERS] as const;
+export type Sticker = (typeof ALL_STICKERS)[number];
+
+export type StickerSetId = "classic" | "halloween";
+/** The album's pages, in order. */
+export const STICKER_SETS: { id: StickerSetId; title: string; stickers: readonly Sticker[] }[] = [
+  { id: "classic", title: "Mes autocollants", stickers: STICKERS },
+  { id: "halloween", title: "Halloween", stickers: HALLOWEEN_STICKERS },
+];
+
+/** Halloween season: 15 October → 2 November (local date), every year. */
+export function isHalloweenSeason(now = new Date()): boolean {
+  const m = now.getMonth(), d = now.getDate();
+  return (m === 9 && d >= 15) || (m === 10 && d <= 2);
+}
 
 // ---------------------------------------------------------------------------
 // Dates (local time)
@@ -97,20 +133,59 @@ const readJson = <T,>(key: string): T | null => {
   }
 };
 
-/** Keep the data usable whatever happened: ≥ 1 profile, valid active selection. */
-function normalize(data: ProgressData): ProgressData {
-  if (!data.profiles.length) data.profiles = [{ id: DEFAULT_PROFILE, name: "", avatar: AVATARS[0] }];
-  const ids = new Set(data.profiles.map((p) => p.id));
-  data.active = data.active.filter((id) => ids.has(id));
+/** Random profile id, unique per install (never the legacy shared "default"). */
+export const newProfileId = () => `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/**
+ * Keep the data usable whatever happened: ≥ 1 profile, unique ids (never the legacy
+ * "default" id that every install used to share — it made the QR sync pair the wrong
+ * profiles), valid active selection. Returns whether ids had to be repaired.
+ */
+function repair(data: ProgressData): boolean {
+  let changed = false;
+  if (!data.profiles.length) {
+    data.profiles = [{ id: newProfileId(), name: "", avatar: AVATARS[0] }];
+    changed = true;
+  }
+  const seen = new Set<string>();
+  data.profiles = data.profiles.map((p) => {
+    const duplicate = seen.has(p.id);
+    if (p.id !== DEFAULT_PROFILE && !duplicate) {
+      seen.add(p.id);
+      return p;
+    }
+    // Legacy shared id, or two profiles sharing one id: give a fresh id. A duplicate gets
+    // a copy of the shared history so no sticker or brushing is lost.
+    const id = newProfileId();
+    seen.add(id);
+    data.data[id] = structuredClone(data.data[p.id] ?? emptyProfile());
+    if (!duplicate) {
+      delete data.data[p.id];
+      data.active = data.active.map((a) => (a === p.id ? id : a));
+    }
+    changed = true;
+    return { ...p, id };
+  });
+  data.active = data.active.filter((id) => seen.has(id));
   if (!data.active.length) data.active = [data.profiles[0].id];
+  return changed;
+}
+
+function normalize(data: ProgressData): ProgressData {
+  repair(data);
   return data;
 }
 
 export function loadProgress(): ProgressData {
   const v2 = readJson<ProgressData>(STORAGE_KEY);
-  if (v2?.version === 2 && Array.isArray(v2.profiles) && v2.data) return normalize(v2);
+  if (v2?.version === 2 && Array.isArray(v2.profiles) && v2.data) {
+    // Repaired ids are saved at once, so every later read sees the same ids.
+    if (repair(v2)) saveProgress(v2);
+    return v2;
+  }
 
-  // First run of this version: migrate the single-child history if there is one.
+  // First run of this version: migrate the single-child history if there is one
+  // (the v1 key is left untouched, so the v0.5 app still finds it).
   const v1 = readJson<ProgressDataV1>(LEGACY_KEY_V1);
   const data: ProgressData = {
     version: 2,
@@ -118,7 +193,9 @@ export function loadProgress(): ProgressData {
     data: v1?.version === 1 && v1.profiles ? { ...v1.profiles } : {},
     active: [DEFAULT_PROFILE],
   };
-  return normalize(data);
+  repair(data);
+  saveProgress(data);
+  return data;
 }
 
 function saveProgress(data: ProgressData) {
@@ -169,7 +246,7 @@ export function setActiveProfiles(ids: string[]) {
 export function addProfile(name: string, avatar: string): ProfileMeta | null {
   const data = loadProgress();
   if (data.profiles.length >= MAX_PROFILES) return null;
-  const profile = { id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: name.trim(), avatar };
+  const profile = { id: newProfileId(), name: name.trim(), avatar };
   data.profiles.push(profile);
   data.data[profile.id] = emptyProfile();
   saveProgress(data);
@@ -183,6 +260,33 @@ export function updateProfile(id: string, patch: Partial<Pick<ProfileMeta, "name
   if (patch.name !== undefined) profile.name = patch.name.trim();
   if (patch.avatar !== undefined) profile.avatar = patch.avatar;
   saveProgress(data);
+}
+
+const sessionKey = (s: Session) => `${s.date}|${s.slot}`;
+
+/** Union of two histories: each brushing once (sorted), every sticker of both, no duplicate. Never removes anything. */
+export function unionHistory(a: ProfileData, b: ProfileData): ProfileData {
+  const known = new Set(a.sessions.map(sessionKey));
+  const sessions = [...a.sessions, ...b.sessions.filter((s) => !known.has(sessionKey(s)))].sort((x, y) =>
+    sessionKey(x).localeCompare(sessionKey(y)),
+  );
+  return { sessions, stickers: [...new Set([...a.stickers, ...b.stickers])] }; // also drops any old duplicate
+}
+
+/**
+ * Two profiles that are the same child (e.g. a "Moi" that received a child's stickers
+ * through an old sync, plus the same child created by hand): everything goes into `keepId`,
+ * then `removeId` is deleted. Returns false if either profile is missing.
+ */
+export function mergeProfiles(keepId: string, removeId: string): boolean {
+  const data = loadProgress();
+  if (keepId === removeId || !data.profiles.some((p) => p.id === keepId) || !data.profiles.some((p) => p.id === removeId)) return false;
+  data.data[keepId] = unionHistory(data.data[keepId] ?? emptyProfile(), data.data[removeId] ?? emptyProfile());
+  data.profiles = data.profiles.filter((p) => p.id !== removeId);
+  delete data.data[removeId];
+  data.active = [...new Set(data.active.map((id) => (id === removeId ? keepId : id)))];
+  saveProgress(normalize(data));
+  return true;
 }
 
 /** Deletes a profile and its history. The last remaining profile can't be deleted. */
@@ -208,7 +312,8 @@ export interface SessionResult {
 
 /**
  * Record a completed 3-minute session. Brushing twice in the same slot counts once.
- * The sticker is drawn at random among those not earned yet (`random` is injectable for tests).
+ * The sticker is drawn at random among those not earned yet — Halloween ones first during the
+ * Halloween season, classics only outside it (`random` is injectable for tests).
  */
 export function recordSession(now = new Date(), profile?: string, random = Math.random): SessionResult {
   const data = loadProgress();
@@ -220,7 +325,10 @@ export function recordSession(now = new Date(), profile?: string, random = Math.
   let newSticker: Sticker | null = null;
   if (!alreadyFilled) {
     p.sessions.push(session);
-    const remaining = STICKERS.filter((s) => !p.stickers.includes(s.id));
+    // In season, Halloween stickers first (then the classics once all are won); otherwise classics only.
+    const notWon = (set: readonly Sticker[]) => set.filter((s) => !p.stickers.includes(s.id));
+    const spooky = isHalloweenSeason(now) ? notWon(HALLOWEEN_STICKERS) : [];
+    const remaining = spooky.length ? spooky : notWon(STICKERS);
     newSticker = remaining.length ? remaining[Math.floor(random() * remaining.length)] : null;
     if (newSticker) p.stickers.push(newSticker.id);
   }

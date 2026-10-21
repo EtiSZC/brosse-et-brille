@@ -34,6 +34,16 @@ export const getAudioContext = (): AudioContext | null => getCtx();
 
 /** Call from a user gesture (tap) so later, timer-driven sounds are allowed on iOS. */
 export function unlockAudio() {
+  // iPhone (Safari 16.4+/17): play like a media app, so the silent switch doesn't mute
+  // Lily and the music. No-op where the Audio Session API doesn't exist (Android, desktop).
+  const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (audioSession) {
+    try {
+      audioSession.type = "playback";
+    } catch {
+      // Not allowed in this context: keep the default behaviour.
+    }
+  }
   const c = getCtx();
   if (!c) return;
   // Playing a silent one-sample buffer inside the gesture fully unlocks iOS Safari.

@@ -66,7 +66,10 @@ const BathroomBackground = ({ tint, className, children }: BathroomBackgroundPro
       ))}
     </svg>
 
-    <div className="relative z-10 flex flex-col min-h-screen">{children}</div>
+    {/* Safe areas: keep content clear of the iPhone notch and home bar (0 elsewhere). */}
+    <div className="relative z-10 flex flex-col min-h-screen pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      {children}
+    </div>
   </div>
 );
 

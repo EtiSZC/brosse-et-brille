@@ -2,10 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import SyncScreen from "./SyncScreen";
 import ParentsScreen from "./ParentsScreen";
-import { addProfile, getProfile, listProfiles, recordSession, type ProgressData } from "@/lib/progress";
+import { addProfile, getProfile, listProfiles, recordSession, replaceProgress, type ProgressData } from "@/lib/progress";
 import { encodeState } from "@/lib/sync";
 
-vi.mock("@/lib/scanner", () => ({ canScan: () => false, scanQr: vi.fn() }));
+const scannerMode = vi.hoisted(() => ({ camera: false }));
+vi.mock("@/lib/scanner", () => ({
+  canScan: () => scannerMode.camera,
+  usesNativeScanner: () => false,
+  scanQr: vi.fn(),
+}));
+// Stand-in for the in-browser camera: a button that "reads" whatever code the test provides.
+const cameraCode = vi.hoisted(() => ({ text: "" }));
+vi.mock("@/components/CameraScanner", () => ({
+  default: ({ onResult }: { onResult: (t: string) => void }) => (
+    <button onClick={() => onResult(cameraCode.text)}>caméra simulée</button>
+  ),
+}));
 
 const otherPhone = (profiles: { id: string; name: string; avatar: string; stickers: string[]; sessions: { date: string; slot: "morning" | "evening" }[] }[]): string => {
   const data: ProgressData = {
@@ -24,6 +36,7 @@ const paste = (code: string) => {
 describe("sync screen", () => {
   let leaId: string;
   beforeEach(() => {
+    scannerMode.camera = false;
     localStorage.clear();
     leaId = addProfile("Léa", "🦊")!.id;
     recordSession(new Date(2026, 9, 10, 8), leaId, () => 0); // unicorn
@@ -34,7 +47,7 @@ describe("sync screen", () => {
     await waitFor(() => expect(screen.getByAltText("QR code de ce téléphone")).toHaveAttribute("src", expect.stringContaining("data:image/svg+xml")));
   });
 
-  it("first sync: match by name, add the new child, preview, merge, then show the updated code", async () => {
+  it("first sync: match by name, the new child takes over the empty 'Moi' profile, preview, merge, then show the updated code", async () => {
     render(<SyncScreen onBack={() => {}} />);
     paste(
       otherPhone([
@@ -44,7 +57,8 @@ describe("sync screen", () => {
     );
     expect(screen.getByText("Qui est qui ?")).toBeInTheDocument();
     expect(screen.getByLabelText("lea correspond à")).toHaveValue(`local:${leaId}`);
-    expect(screen.getByLabelText("Zoé correspond à")).toHaveValue("add");
+    const placeholderId = listProfiles().find((p) => !p.name)!.id; // fresh install's empty "Moi"
+    expect(screen.getByLabelText("Zoé correspond à")).toHaveValue(`local:${placeholderId}`);
 
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     expect(screen.getByText("+1 brossage, +1 autocollant")).toBeInTheDocument();
@@ -53,8 +67,9 @@ describe("sync screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fusionner" }));
     expect(screen.getByText("✓ Synchronisé")).toBeInTheDocument();
     expect(screen.getByText(/À votre tour/)).toBeInTheDocument();
-    // The fresh install's unnamed default profile, Léa (matched, local name kept), Zoé (added).
-    expect(listProfiles().map((p) => p.name)).toEqual(["", "Léa", "Zoé"]);
+    // The empty "Moi" became Zoé (name + avatar from the other phone); Léa matched, local name kept. No leftover "Moi".
+    expect(listProfiles().map((p) => p.name)).toEqual(["Zoé", "Léa"]);
+    expect(getProfile(listProfiles().find((p) => p.name === "Zoé")!.id).stickers).toEqual(["bee"]);
     const lea = listProfiles().find((p) => p.name === "Léa")!;
     expect(getProfile(lea.id).stickers.sort()).toEqual(["rocket", "unicorn"]);
     expect(listProfiles().some((p) => p.name === "Zoé")).toBe(true);
@@ -103,5 +118,30 @@ describe("sync screen", () => {
     render(<ParentsScreen onBack={() => {}} onSync={onSync} />);
     fireEvent.click(screen.getByRole("button", { name: "Synchroniser avec un autre téléphone" }));
     expect(onSync).toHaveBeenCalled();
+  });
+
+  it("in a browser with a camera (PWA): scans through the in-page camera", () => {
+    scannerMode.camera = true;
+    cameraCode.text = otherPhone([{ id: "px", name: "Zoé", avatar: "🐰", stickers: ["bee"], sessions: [] }]);
+    render(<SyncScreen onBack={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /Scanner l'autre téléphone/ }));
+    fireEvent.click(screen.getByRole("button", { name: "caméra simulée" }));
+    expect(screen.queryByRole("button", { name: "caméra simulée" })).not.toBeInTheDocument(); // camera closed
+    expect(screen.getByText("Qui est qui ?")).toBeInTheDocument();
+  });
+
+  it("parents area: repair card folds a 'Moi' holding Léa's stickers into Léa, losing nothing", () => {
+    replaceProgress({
+      version: 2,
+      profiles: [{ id: "pMoi", name: "", avatar: "🐸" }, { id: "pLea", name: "Léa", avatar: "🦊" }],
+      data: { pMoi: { sessions: [], stickers: ["unicorn", "rocket"] }, pLea: { sessions: [], stickers: [] } },
+      active: ["pLea"],
+    });
+    render(<ParentsScreen onBack={() => {}} onSync={() => {}} />);
+    expect(screen.getByText(/« Moi » contient 2 autocollants/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /C'est 🦊 Léa/ }));
+    expect(listProfiles().map((p) => p.name)).toEqual(["Léa"]);
+    expect(getProfile("pLea").stickers.sort()).toEqual(["rocket", "unicorn"]);
+    expect(screen.queryByRole("region", { name: "Profil en double" })).not.toBeInTheDocument();
   });
 });

@@ -23,7 +23,9 @@ describe("child profiles", () => {
     const v1 = { version: 1, profiles: { default: { sessions: [{ date: "2026-10-07", slot: "morning" }], stickers: ["unicorn"] } } };
     localStorage.setItem(V1, JSON.stringify(v1));
     const [first] = listProfiles();
-    expect(first).toMatchObject({ id: "default", name: "", avatar: AVATARS[0] });
+    expect(first).toMatchObject({ name: "", avatar: AVATARS[0] });
+    expect(first.id).toMatch(/^p[0-9a-z]+$/); // unique per install, never the old shared "default"
+    expect(listProfiles()[0].id).toBe(first.id); // the new id is saved: stable across reads
     expect(getProfile(first.id).stickers).toEqual(["unicorn"]);
     recordSession(at(7, 20)); // first write saves v2
     expect(JSON.parse(localStorage.getItem(V1)!)).toEqual(v1); // untouched for a rollback to v0.5
@@ -73,5 +75,33 @@ describe("child profiles", () => {
     deleteProfile(lea.id);
     deleteProfile(tom.id);
     expect(getActiveProfiles()).toHaveLength(1); // falls back to the remaining profile
+  });
+
+  it("gives a stored 'default' profile a unique id once, keeping its history, album and active selection", () => {
+    localStorage.setItem("brosse-brille:progress:v2", JSON.stringify({
+      version: 2,
+      profiles: [{ id: "default", name: "Léa", avatar: "🦊" }, { id: "pTom", name: "Tom", avatar: "🐼" }],
+      data: { default: { sessions: [{ date: "2026-10-07", slot: "morning" }], stickers: ["unicorn"] }, pTom: { sessions: [], stickers: ["lion"] } },
+      active: ["default"],
+    }));
+    const [lea, tom] = listProfiles();
+    expect(lea.id).not.toBe("default");
+    expect(listProfiles()[0].id).toBe(lea.id); // saved: same id on every read
+    expect(getProfile(lea.id)).toEqual({ sessions: [{ date: "2026-10-07", slot: "morning" }], stickers: ["unicorn"] });
+    expect(getActiveProfiles().map((p) => p.name)).toEqual(["Léa"]);
+    expect(getProfile(tom.id).stickers).toEqual(["lion"]);
+  });
+
+  it("splits two profiles sharing one id, each keeping a copy of the album (nothing lost)", () => {
+    localStorage.setItem("brosse-brille:progress:v2", JSON.stringify({
+      version: 2,
+      profiles: [{ id: "pSame", name: "Léa", avatar: "🦊" }, { id: "pSame", name: "Tom", avatar: "🐼" }],
+      data: { pSame: { sessions: [], stickers: ["unicorn", "lion"] } },
+      active: ["pSame"],
+    }));
+    const [a, b] = listProfiles();
+    expect(a.id).not.toBe(b.id);
+    expect(getProfile(a.id).stickers).toEqual(["unicorn", "lion"]);
+    expect(getProfile(b.id).stickers).toEqual(["unicorn", "lion"]);
   });
 });

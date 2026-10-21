@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { isMuted, setMuted, subscribeMuted, playFanfare } from "./sounds";
+import { isMuted, setMuted, subscribeMuted, playFanfare, unlockAudio } from "./sounds";
 
 describe("sounds mute setting", () => {
   it("persists to localStorage and notifies subscribers", () => {
@@ -19,5 +19,13 @@ describe("sounds mute setting", () => {
 
   it("does not throw when Web Audio is unavailable (jsdom)", () => {
     expect(() => playFanfare()).not.toThrow();
+  });
+
+  it("asks iPhone Safari to play like a media app (silent switch doesn't mute)", () => {
+    const audioSession = { type: "auto" };
+    Object.defineProperty(navigator, "audioSession", { value: audioSession, configurable: true });
+    unlockAudio();
+    expect(audioSession.type).toBe("playback");
+    delete (navigator as unknown as Record<string, unknown>).audioSession;
   });
 });

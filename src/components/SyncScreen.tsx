@@ -3,7 +3,8 @@ import QRCode from "qrcode";
 import BathroomBackground from "@/components/BathroomBackground";
 import { Button } from "@/components/ui/button";
 import { displayName, loadProgress, replaceProgress } from "@/lib/progress";
-import { canScan, scanQr } from "@/lib/scanner";
+import { canScan, scanQr, usesNativeScanner } from "@/lib/scanner";
+import CameraScanner from "@/components/CameraScanner";
 import {
   decodeState,
   encodeState,
@@ -49,6 +50,15 @@ const QrCard = ({ text, caption }: { text: string; caption: string }) => {
   );
 };
 
+/** "+2 brossages, +1 autocollant" (zero parts left out), or "déjà à jour". */
+const additions = (sessions: number, stickers: number) =>
+  [
+    sessions ? `+${sessions} brossage${sessions > 1 ? "s" : ""}` : "",
+    stickers ? `+${stickers} autocollant${stickers > 1 ? "s" : ""}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ") || "déjà à jour";
+
 const targetValue = (t: MatchTarget) => (t.kind === "local" ? `local:${t.id}` : t.kind);
 const parseTarget = (v: string): MatchTarget => (v.startsWith("local:") ? { kind: "local", id: v.slice(6) } : { kind: v as "add" | "ignore" });
 
@@ -57,6 +67,7 @@ const SyncScreen = ({ onBack }: SyncScreenProps) => {
   const [step, setStep] = useState<Step>({ kind: "show" });
   const [error, setError] = useState("");
   const [pasted, setPasted] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false); // in-browser scanner (PWA)
   const [local, setLocal] = useState(loadProgress); // this phone's state (updated after a merge)
   const myCode = useMemo(() => encodeState(local), [local]);
 
@@ -70,6 +81,7 @@ const SyncScreen = ({ onBack }: SyncScreenProps) => {
   };
 
   const scan = async () => {
+    if (!usesNativeScanner()) return setCameraOpen(true);
     try {
       const text = await scanQr();
       if (text) readCode(text);
@@ -190,11 +202,7 @@ const SyncScreen = ({ onBack }: SyncScreenProps) => {
                   </span>
                   <span className="flex-1 truncate">{s.name || "Moi"}</span>
                   <span className="text-sm text-ink/80">
-                    {s.isNew
-                      ? "nouveau"
-                      : s.addedSessions || s.addedStickers
-                        ? `+${s.addedSessions} brossage${s.addedSessions > 1 ? "s" : ""}, +${s.addedStickers} autocollant${s.addedStickers > 1 ? "s" : ""}`
-                        : "déjà à jour"}
+                    {s.isNew ? "nouveau" : additions(s.addedSessions, s.addedStickers)}
                   </span>
                 </li>
               ))}
@@ -230,6 +238,16 @@ const SyncScreen = ({ onBack }: SyncScreenProps) => {
               Terminer
             </Button>
           </>
+        )}
+
+        {cameraOpen && (
+          <CameraScanner
+            onResult={(text) => {
+              setCameraOpen(false);
+              readCode(text);
+            }}
+            onCancel={() => setCameraOpen(false)}
+          />
         )}
 
         {error && (

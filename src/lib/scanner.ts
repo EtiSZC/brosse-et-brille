@@ -1,8 +1,12 @@
 import { Capacitor } from "@capacitor/core";
 import { BarcodeFormat, BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
-/** The camera scanner only exists in the Android app (the browser uses "Coller un code"). */
-export const canScan = () => Capacitor.isNativePlatform();
+/** Android app: Google's ML Kit scanner. Browser / PWA (iPhone): the in-page camera scanner. */
+export const usesNativeScanner = () => Capacitor.isNativePlatform();
+
+/** A camera scanner is available (otherwise only "Coller un code"). */
+export const canScan = () =>
+  usesNativeScanner() || (typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia);
 
 export class ScannerNotReady extends Error {}
 
