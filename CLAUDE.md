@@ -2,7 +2,7 @@
 
 A playful PWA that guides children (ages 3–8) through a 3-minute tooth-brushing session with the mascot **Brillou**. UI language is **French**. Originally scaffolded in Lovable (project `5e07ab90-e764-4e9b-8721-6225fc74815b`, "Sparkle Brush Buddy"), mirrored to the private GitHub repo `EtiSZC/quenottes`; now developed locally.
 
-**Git:** this project's repo is `EtiSZC/brosse-et-brille` (private, remote `origin`). Never push to or add `EtiSZC/quenottes` as a remote — it is only a read-only source for binary assets.
+**Git:** this project's repo is `EtiSZC/brosse-et-brille` (public, remote `origin`). Never push to or add `EtiSZC/quenottes` as a remote — it is only a read-only source for binary assets.
 
 ## Commands
 
@@ -33,23 +33,23 @@ Built APKs are copied to `releases/` (git-ignored, kept locally) as `brosse-et-b
 | `releases/brosse-et-brille-v0.6-debug.apk` | `main` @ `25c2490` (code of `2b2e162`), 2026-10-07 | v0.5 + child profiles (up to 4, picker, brushing together, parents screen behind a 2 s hold), plural Lily line. |
 | `releases/brosse-et-brille-v0.7-debug.apk` | `main` (code of `4e5733d`), 2026-10-07 | v0.6 + music mode (synthesized loop synced to the steps, on by default, 🎵 toggle, ducks under the voice). |
 | `releases/brosse-et-brille-v0.8-debug.apk` | `main` @ `ca5fe75` (code of `ecd988e`), rebuilt 2026-10-11 14:16 | v0.7 + two-phone sync by QR code (parents area → Synchroniser; union merge with the `findLosses()` safety net, no backend). 31 MB: the ML Kit plugin bundles `libbarhopper_v3.so` for 4 ABIs although scanning uses the Play-services code scanner — can be trimmed later. |
-| `releases/brosse-et-brille-v0.8.1-debug.apk` | branch `fix-sync-stickers` @ `4c25640`, built 2026-10-14 16:33 | v0.8 + sync fix: each child's stickers go to that child (unique ids, name-aware matching, "Moi" takes the child's name, repair card in the parents area). **Candidate — awaiting the two-phone test before merge.** Installed on the Galaxy A55 on 2026-10-15 (Lise's legacy `default` id migrated, 12/12 stickers kept). |
-| `releases/brosse-et-brille-v0.9-debug.apk` | branch `phase-9-halloween` @ `c74dce8`, built 2026-10-19 11:12 | v0.8.1 (sync fix included) + Halloween sticker batch (15 stickers, only 15 Oct – 2 Nov, night-themed album page). **Candidate — to install on both phones** (also covers the two-phone test of the sync fix). |
+| `releases/brosse-et-brille-v0.8.1-debug.apk` | branch `fix-sync-stickers` @ `4c25640`, built 2026-10-14 16:33 | v0.8 + sync fix: each child's stickers go to that child (unique ids, name-aware matching, "Moi" takes the child's name, repair card in the parents area). Superseded by v0.9. Installed on the Galaxy A55 on 2026-10-15 (Lise's legacy `default` id migrated, 12/12 stickers kept). |
+| `releases/brosse-et-brille-v0.9-debug.apk` | branch `phase-9-halloween` @ `c74dce8`, built 2026-10-19 11:12 | v0.8.1 (sync fix included) + Halloween sticker batch (15 stickers, only 15 Oct – 2 Nov, night-themed album page). Two-phone sync test validated by the user on 2026-10-21; merged into `main` (`26ef61a`). |
 
 Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capacitor/assets generate --android --iconBackgroundColor '#DFF7F0' --splashBackgroundColor '#DFF7F0'`. Fonts are bundled via `@fontsource` (no network needed at runtime).
 
-## PWA on GitHub Pages (iPhone testers) — branch `phase-8-pwa`
+## PWA on GitHub Pages (iPhone testers) — branch `main`
 
 Live at **https://etiszc.github.io/brosse-et-brille/** — open in **Safari** → Partager → « Sur l'écran d'accueil »; full-screen and offline after the first visit. Same link works on Android browsers.
 
-- **Deploy**: `.github/workflows/pages.yml` runs on every push to `phase-8-pwa` (npm ci → npm test → `PAGES_BASE=/brosse-et-brille/ npm run build` → deploy-pages). Pages source = GitHub Actions; the `github-pages` environment allows `main` and `phase-8-pwa`. Pushing a change to `.github/workflows/` needs the `workflow` scope: `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` (the keychain credential lacks it).
+- **Deploy**: `.github/workflows/pages.yml` runs on every push to `main` (was `phase-8-pwa` until the merge on 2026-10-21) (npm ci → npm test → `PAGES_BASE=/brosse-et-brille/ npm run build` → deploy-pages). Pages source = GitHub Actions; the `github-pages` environment allows `main` and `phase-8-pwa`. Pushing a change to `.github/workflows/` needs the `workflow` scope: `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` (the keychain credential lacks it).
 - **Base path**: `vite.config.ts` uses `PAGES_BASE` only for Pages; every other build (dev, **Android/Capacitor**) keeps `/`. Router `basename = import.meta.env.BASE_URL`; `404.html` copied only in the Pages build.
 - **Offline**: workbox precaches js/css/html, Lily's 13 mp3, the 7 woff2 fonts, images and icons (`maximumFileSizeToCacheInBytes` 3 MB). Verified offline on the live site (reload + voice clip from cache).
 - **iPhone specifics**: `navigator.audioSession.type = "playback"` in `unlockAudio()` (silent switch doesn't mute), `viewport-fit=cover` + safe-area padding in `BathroomBackground`, apple-touch-icon / PWA icons in `public/` (generated from `assets/logo.png`), `navigator.storage.persist()` at start.
 - **QR sync in the browser**: `src/components/CameraScanner.tsx` (getUserMedia back camera + `jsqr`, only `BB1` codes, camera stopped on read/cancel); the Android app keeps ML Kit (`usesNativeScanner()` in `src/lib/scanner.ts`).
 - **Credit**: « Voix de Brillou : elevenlabs.io » in the parents area (free ElevenLabs plan, public repo → attribution required, non-commercial).
 - CI notices (2026-10): GitHub actions on Node 20 are forced to Node 24 (bump to v5 actions when available); `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19.
-- **Merge gate** before merging into `main`: all tests + Android regression on the Galaxy A55 + user's OK; then switch the workflow trigger to `main`.
+- **Merged into `main` on 2026-10-21** (all tests, Android regression on the Galaxy A55, two-phone sync test with v0.9, user's OK); the workflow now deploys from `main`.
 
 ## Brillou's voice (ElevenLabs)
 
@@ -126,6 +126,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 | `v0.6-profiles` | Phase 5 on top of v0.5: up to 4 child profiles (name + animal emoji), "Qui se brosse les dents ?" picker, brushing together, parents screen behind a 2 s hold, per-child calendar/streak/album. APK: `releases/brosse-et-brille-v0.6-debug.apk`. Validated on the Galaxy A55 on 2026-10-07. Last version before the music mode. |
 | `v0.7-music` | Music mode on top of v0.6: synthesized loop synced to the steps, on by default, 🎵 toggle, ducks under the voice. APK: `releases/brosse-et-brille-v0.7-debug.apk`. Validated on the Galaxy A55 on 2026-10-07. Last version before two-phone QR sync. |
 | `v0.8.1-sync-fix-candidate` | Local tag (not pushed): `fix-sync-stickers` @ `0c52142`, the sync fix awaiting the two-phone test. Last state before the Halloween stickers. |
+| `v0.9-halloween` | `main` @ merge of the PWA + sync fix + Halloween stickers (2026-10-21), validated on two phones. APK: `releases/brosse-et-brille-v0.9-debug.apk`. |
 | `v0.8-sync` | Two-phone QR sync on top of v0.7 (union merge + no-loss safety net). APK: `releases/brosse-et-brille-v0.8-debug.apk`. Validated on the Galaxy A55 on 2026-10-11. Last version before the PWA / GitHub Pages work. |
 
 To go back to a restore point:
@@ -153,7 +154,7 @@ npm run android    # rebuild + reinstall on the phone
 5. ✅ **Child profiles** (done 2026-10-07, merged; validated on the phone) — up to 4 profiles (name + animal emoji), "Qui se brosse les dents ?" picker when ≥ 2, brushing together (each child gets their slot and sticker), per-child calendar/streak/album, parents screen behind a 2 s long press. Names shown on screen, never spoken or sent anywhere.
 6. ✅ **Music mode** (done 2026-10-07, merged; validated on the phone) — synthesized cheerful loop synced to the steps, on by default (🎵 toggle), ducks under Brillou's voice. ElevenLabs Music was tried first but its API needs a paid plan.
 7. ✅ **Two-phone sync** (done 2026-10-11, merged; real scan validated on the Galaxy A55 — QR shown on the Mac, "déjà à jour") — QR code both ways from the parents area, offline, no backend; union merge so no sticker or brushing is ever lost.
-7b. ✅ **Sync fix: each child's stickers** (2026-10-14, branch `fix-sync-stickers`; awaiting phone test) — every install used the id `default` for its first profile, so the first child landed in the other phone's empty "Moi" and hand-made duplicates never got stickers. Unique ids, name-aware matching, name filling, collision guard, repair card. Guarantee: after syncing both ways, both phones have the same children and **one separate album per child** = the union of that child's stickers.
-8. 🔄 **PWA for iPhone testers** (2026-10-12, branch `phase-8-pwa`, live on GitHub Pages; awaiting iPhone test + Android regression before merge).
-9. ✅ **Halloween stickers** (2026-10-19, branch `phase-9-halloween` from `fix-sync-stickers`; validated on the Galaxy A55 on 2026-10-19; merged into `phase-8-pwa` → live on GitHub Pages) — every child had all 20 stickers; 15 Halloween stickers (🎃 👻 🦇 🧙 🧹 🐈‍⬛ 🦉 🌕 🔮 🕸️ 🧛 🪄 💀 🧟 🕷️ — skull, zombie and spider kept at the user's request), winnable only 15 Oct – 2 Nov (user's choice), kept forever. Sync field `h`. Still to merge into `main` once the two-phone sync test is confirmed.
+7b. ✅ **Sync fix: each child's stickers** (2026-10-14, branch `fix-sync-stickers`; two-phone test validated 2026-10-21, merged into `main`) — every install used the id `default` for its first profile, so the first child landed in the other phone's empty "Moi" and hand-made duplicates never got stickers. Unique ids, name-aware matching, name filling, collision guard, repair card. Guarantee: after syncing both ways, both phones have the same children and **one separate album per child** = the union of that child's stickers.
+8. ✅ **PWA for iPhone testers** (2026-10-12, live on GitHub Pages; Android regression validated, merged into `main` on 2026-10-21, Pages now deploys from `main`).
+9. ✅ **Halloween stickers** (2026-10-19, branch `phase-9-halloween` from `fix-sync-stickers`; validated on the Galaxy A55 on 2026-10-19; merged into `phase-8-pwa` → live on GitHub Pages) — every child had all 20 stickers; 15 Halloween stickers (🎃 👻 🦇 🧙 🧹 🐈‍⬛ 🦉 🌕 🔮 🕸️ 🧛 🪄 💀 🧟 🕷️ — skull, zombie and spider kept at the user's request), winnable only 15 Oct – 2 Nov (user's choice), kept forever. Sync field `h`. Merged into `main` on 2026-10-21.
 10. **Later** — Brillou poses (needs illustration), parent corner with history/tips, optional local reminders, signed release build for Google Play (+ paid ElevenLabs plan and regenerated clips for commercial use).

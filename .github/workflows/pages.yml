@@ -1,10 +1,10 @@
 # Deploys the PWA (iPhone testers) to GitHub Pages: https://etiszc.github.io/brosse-et-brille/
-# Triggered only from the phase-8-pwa branch, so main (Android) is untouched until the merge.
+# Triggered from main (the PWA was merged on 2026-10-21).
 name: Deploy PWA to GitHub Pages
 
 on:
   push:
-    branches: [phase-8-pwa]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
