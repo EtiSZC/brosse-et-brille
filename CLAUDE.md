@@ -4,6 +4,8 @@ A playful PWA that guides children (ages 3–8) through a 3-minute tooth-brushin
 
 **Git:** this project's repo is `EtiSZC/quenottes` (public, remote `origin`; named `EtiSZC/brosse-et-brille` until 2026-10-21 — GitHub redirects the old name). Never push to or add `EtiSZC/quenottes-lovable` as a remote — it is the old Lovable mirror (it was called `EtiSZC/quenottes` until 2026-10-21), only a read-only source for binary assets.
 
+**Website:** the presentation site lives in `site/`, which is its own git repo `EtiSZC/quenottes-site` (public, GitHub Pages from `main` /, custom domain **https://quenottes.site** via `CNAME`; domain bought at OVH 2026-10-21, DNS: apex A/AAAA → GitHub Pages IPs, `www` CNAME → `etiszc.github.io`). It is excluded from this repo via `.git/info/exclude`. Never give the user-site repo `etiszc.github.io` a custom domain: GitHub would move the app to that domain too (new origin → testers lose their localStorage).
+
 ## Commands
 
 ```bash
