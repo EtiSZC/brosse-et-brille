@@ -13,7 +13,7 @@ const SCAN_EVERY_MS = 100;
 
 /**
  * In-browser QR scanner (PWA / iPhone): back camera via getUserMedia, frames decoded
- * with jsQR. Only Brosse & Brille codes are accepted. The camera stops as soon as a
+ * with jsQR. Only Quenottes codes are accepted. The camera stops as soon as a
  * code is read, on cancel, or when the component unmounts.
  */
 const CameraScanner = ({ onResult, onCancel }: CameraScannerProps) => {

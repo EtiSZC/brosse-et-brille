@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Brosse &amp; Brille</string>
-    <string name="title_activity_main">Brosse &amp; Brille</string>
-    <string name="package_name">com.etiszc.brosseetbrille</string>
-    <string name="custom_url_scheme">com.etiszc.brosseetbrille</string>
+    <string name="app_name">Quenottes</string>
+    <string name="title_activity_main">Quenottes</string>
+    <string name="package_name">com.etiszc.quenottes</string>
+    <string name="custom_url_scheme">com.etiszc.quenottes</string>
 </resources>

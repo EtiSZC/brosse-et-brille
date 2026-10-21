@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.etiszc.brosseetbrille',
-  appName: 'Brosse & Brille',
+  appId: 'com.etiszc.quenottes',
+  appName: 'Quenottes',
   webDir: 'dist'
 };
 

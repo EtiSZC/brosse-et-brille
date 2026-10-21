@@ -49,7 +49,7 @@ describe("sync payload", () => {
     expect(encodeState(state(kids), NOW).length).toBeLessThan(1000);
   });
 
-  it("refuses anything that isn't a valid Brosse & Brille code", () => {
+  it("refuses anything that isn't a valid Quenottes code", () => {
     const good = encodeState(state([{ id: "pabc", name: "Léa" }]), NOW);
     const json = JSON.parse(good.slice(SYNC_PREFIX.length));
     const tamper = (patch: (j: typeof json) => void) => {

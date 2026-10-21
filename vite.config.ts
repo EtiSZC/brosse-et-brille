@@ -35,8 +35,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png"],
       manifest: {
-        name: "Brosse & Brille",
-        short_name: "Brosse&Brille",
+        name: "Quenottes",
+        short_name: "Quenottes",
         description: "App ludique de brossage de dents pour enfants",
         theme_color: "#DFF7F0",
         background_color: "#DFF7F0",

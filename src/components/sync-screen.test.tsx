@@ -100,7 +100,7 @@ describe("sync screen", () => {
     const before = localStorage.getItem("brosse-brille:progress:v2");
     render(<SyncScreen onBack={() => {}} />);
     paste("https://example.com");
-    expect(screen.getByRole("alert")).toHaveTextContent("ne vient pas de Brosse & Brille");
+    expect(screen.getByRole("alert")).toHaveTextContent("ne vient pas de Quenottes");
     expect(localStorage.getItem("brosse-brille:progress:v2")).toBe(before);
   });
 

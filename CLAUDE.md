@@ -1,4 +1,4 @@
-# Brosse & Brille
+# Quenottes (formerly Brosse & Brille)
 
 A playful PWA that guides children (ages 3–8) through a 3-minute tooth-brushing session with the mascot **Brillou**. UI language is **French**. Originally scaffolded in Lovable (project `5e07ab90-e764-4e9b-8721-6225fc74815b`, "Sparkle Brush Buddy"), mirrored to the private GitHub repo `EtiSZC/quenottes`; now developed locally.
 
@@ -19,7 +19,7 @@ Don't use Playwright's fake clock (`page.clock`) for visual checks: it desyncs f
 
 ## Android app (Capacitor)
 
-`android/` is a Capacitor 8 native project (app id `com.etiszc.brosseetbrille`, portrait only) that packages `dist/` into an APK. Toolchain on this Mac: Java 21 (`brew openjdk@21`, keg-only) and the Android SDK at `/opt/homebrew/share/android-commandlinetools` (platform 36, build-tools 36). Target phone: Samsung Galaxy A55 (Android 16), connected over USB with debugging on.
+`android/` is a Capacitor 8 native project (app id `com.etiszc.quenottes` since the rename — `com.etiszc.brosseetbrille` up to v0.9, a different app for Android, so its data must be copied over or re-synced by QR; portrait only) that packages `dist/` into an APK. Toolchain on this Mac: Java 21 (`brew openjdk@21`, keg-only) and the Android SDK at `/opt/homebrew/share/android-commandlinetools` (platform 36, build-tools 36). Target phone: Samsung Galaxy A55 (Android 16), connected over USB with debugging on.
 
 ```bash
 npm run android   # build web → cap sync → gradle assembleDebug → adb install → launch
@@ -35,6 +35,7 @@ Built APKs are copied to `releases/` (git-ignored, kept locally) as `brosse-et-b
 | `releases/brosse-et-brille-v0.8-debug.apk` | `main` @ `ca5fe75` (code of `ecd988e`), rebuilt 2026-10-11 14:16 | v0.7 + two-phone sync by QR code (parents area → Synchroniser; union merge with the `findLosses()` safety net, no backend). 31 MB: the ML Kit plugin bundles `libbarhopper_v3.so` for 4 ABIs although scanning uses the Play-services code scanner — can be trimmed later. |
 | `releases/brosse-et-brille-v0.8.1-debug.apk` | branch `fix-sync-stickers` @ `4c25640`, built 2026-10-14 16:33 | v0.8 + sync fix: each child's stickers go to that child (unique ids, name-aware matching, "Moi" takes the child's name, repair card in the parents area). Superseded by v0.9. Installed on the Galaxy A55 on 2026-10-15 (Lise's legacy `default` id migrated, 12/12 stickers kept). |
 | `releases/brosse-et-brille-v0.9-debug.apk` | `main` @ `be21698` (tag `v0.9-halloween`), rebuilt 2026-10-21 19:39 (first build: `phase-9-halloween` @ `c74dce8`, 2026-10-19) | v0.8.1 (sync fix included) + Halloween sticker batch (15 stickers, only 15 Oct – 2 Nov, night-themed album page). Two-phone sync test validated by the user on 2026-10-21; merged into `main` (`26ef61a`). SHA-256 `dedb71b3…`. Not published as a GitHub release (upload failed 2026-10-21; the next release will carry the Quenottes name). |
+| `releases/quenottes-v0.10-debug.apk` | branch `phase-10-quenottes` @ `1f4f3ff`, built 2026-10-21 20:49 | v0.9 renamed **Quenottes** (new app id `com.etiszc.quenottes`) + « Bain moussant » background. Installed on the Galaxy A55 on 2026-10-21; the old app's localStorage was copied over with `run-as` (backup `releases/a55-brosseetbrille-localstorage-2026-10-21.tar`): Lise 22 stickers, 14-day streak, Diane kept. The old « Brosse & Brille » app is still installed. **Candidate — awaiting the user's check.** |
 
 Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capacitor/assets generate --android --iconBackgroundColor '#DFF7F0' --splashBackgroundColor '#DFF7F0'`. Fonts are bundled via `@fontsource` (no network needed at runtime).
 
@@ -71,7 +72,8 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 ## Architecture
 
 - `src/pages/Index.tsx` — state machine: `who` (picker, start screen when ≥ 2 profiles) → `home` → `brushing` → `celebration`, plus `album` and `parents`. On completion it calls `recordSessions()` (one entry per active child) and passes the results to the celebration.
-- `src/components/BathroomBackground.tsx` — shared "candy bathroom" scene (tiles, optional tint, rising bubbles, foam). Every screen renders inside it.
+- `src/components/BathroomBackground.tsx` — shared « Bain moussant » scene (soft mint gradient, no tile grid since phase 10; optional tint; 14 iridescent soap bubbles with fixed parameters that rise, sway, wobble and pop with a ring + droplets at their own height; foam). Every screen renders inside it.
+- `src/components/AppTitle.tsx` — `APP_NAME` ("Quenottes") as a sticker title with tilted letters, on the home screen and the profile picker. Internal names stay: localStorage keys `brosse-brille:*` and the `BB1` sync prefix (renaming them would lose data / break older phones).
 - `src/components/HomeScreen.tsx` — sticker title, Brillou + speech bubble, `WeekCalendar` + streak, 📒 album button (top right, sticker-count badge), breathing 72px start button (`size="xl"`).
 - `src/components/BrushingScreen.tsx` — timestamp-based timer (`Date.now()` deltas, survives pauses), zone via `getZoneAt()` and phase via `getPhaseAt()` (fractional seconds), pause overlay (✕ and ⏸ both open it; "Arrêter" there cancels), auto-pause on `visibilitychange`, Wake Lock. At 3:00 shows "Bravo, tout brille !" + sparkle wave for 1.8 s, then `onComplete` (once). Layout: small parent timer, `BubbleTimer`, `MouthDiagram` + `MiniMap`, Brillou + `SpeechBubble` with the phase instruction.
 - `src/components/mouth/geometry.ts` — pure, unit-tested logic: smile view (10 teeth per arch: 3 molars, 4 front, 3 molars; molars have cusps), top-down arch view (`ARCH_TEETH`), `targetIndices`, `spotlightWindow`, `zoomViewBox` (1.9× on molars for "side" phases), `brushPlan`/`brushPosition` (ping-pong path across every target tooth, molars back→front), `isSurfaceShiny` (matte → shiny when the brush's first pass reaches a tooth).
@@ -99,7 +101,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - `src/data/brushingZones.ts` — 8 zones, each with `phases[]` (`view`: front / inside / side / top, duration, instruction). Molar zones = side 11 s + top 12 s. Hue family upper 200 / lower 25. Durations sum to 180 s. Instructions use a non-breaking space before "!".
 - `src/lib/sounds.ts` — WebAudio synthesized sounds on one shared `AudioContext`; `unlockAudio()` must be called inside a user tap (iOS); mute persisted in localStorage.
 - `src/hooks/use-wake-lock.ts` — Screen Wake Lock, re-requested when the page becomes visible.
-- `src/index.css` — palette tokens (mint, bubblegum, sunshine, ink, tile), also exposed as Tailwind colours; `.bathroom-tiles`, `.bubble`, `.sticker-title`, squash-and-stretch `.mascot-bounce`, `.breathe`.
+- `src/index.css` — palette tokens (mint, bubblegum, sunshine, ink, tile), also exposed as Tailwind colours; `.bubble-bath`, `.bubble` (+ `.bubble-sway/-pop/-wobble/-film/-rim/-shine`), `.sticker-title`, squash-and-stretch `.mascot-bounce`, `.breathe`.
 
 ## Known issues
 

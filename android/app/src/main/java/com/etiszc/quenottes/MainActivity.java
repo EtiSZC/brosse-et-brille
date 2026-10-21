@@ -1,4 +1,4 @@
-package com.etiszc.brosseetbrille;
+package com.etiszc.quenottes;
 
 import com.getcapacitor.BridgeActivity;
 
