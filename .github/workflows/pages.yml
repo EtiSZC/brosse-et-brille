@@ -1,4 +1,4 @@
-# Deploys the PWA (iPhone testers) to GitHub Pages: https://etiszc.github.io/brosse-et-brille/
+# Deploys the PWA (iPhone testers) to GitHub Pages: https://etiszc.github.io/quenottes/
 # Triggered from main (the PWA was merged on 2026-10-21).
 name: Deploy PWA to GitHub Pages
 
@@ -30,7 +30,7 @@ jobs:
       - name: Build for the Pages sub-path
         run: npm run build
         env:
-          PAGES_BASE: /brosse-et-brille/
+          PAGES_BASE: /quenottes/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

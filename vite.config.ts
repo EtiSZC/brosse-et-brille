@@ -5,7 +5,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// GitHub Pages serves the PWA under a sub-path (e.g. /brosse-et-brille/); every other
+// GitHub Pages serves the PWA under a sub-path (e.g. /quenottes/); every other
 // build (dev server, Android/Capacitor) keeps "/". Set only by the Pages workflow.
 const base = process.env.PAGES_BASE ?? "/";
 

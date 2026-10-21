@@ -1,8 +1,8 @@
 # Quenottes (formerly Brosse & Brille)
 
-A playful PWA that guides children (ages 3–8) through a 3-minute tooth-brushing session with the mascot **Brillou**. UI language is **French**. Originally scaffolded in Lovable (project `5e07ab90-e764-4e9b-8721-6225fc74815b`, "Sparkle Brush Buddy"), mirrored to the private GitHub repo `EtiSZC/quenottes`; now developed locally.
+A playful PWA that guides children (ages 3–8) through a 3-minute tooth-brushing session with the mascot **Brillou**. UI language is **French**. Originally scaffolded in Lovable (project `5e07ab90-e764-4e9b-8721-6225fc74815b`, "Sparkle Brush Buddy"), mirrored to the private GitHub repo `EtiSZC/quenottes-lovable` (then named `EtiSZC/quenottes`); now developed locally.
 
-**Git:** this project's repo is `EtiSZC/brosse-et-brille` (public, remote `origin`). Never push to or add `EtiSZC/quenottes` as a remote — it is only a read-only source for binary assets.
+**Git:** this project's repo is `EtiSZC/quenottes` (public, remote `origin`; named `EtiSZC/brosse-et-brille` until 2026-10-21 — GitHub redirects the old name). Never push to or add `EtiSZC/quenottes-lovable` as a remote — it is the old Lovable mirror (it was called `EtiSZC/quenottes` until 2026-10-21), only a read-only source for binary assets.
 
 ## Commands
 
@@ -41,9 +41,9 @@ Icons and splash are generated from `assets/logo.png` (Brillou) with `npx @capac
 
 ## PWA on GitHub Pages (iPhone testers) — branch `main`
 
-Live at **https://etiszc.github.io/brosse-et-brille/** — open in **Safari** → Partager → « Sur l'écran d'accueil »; full-screen and offline after the first visit. Same link works on Android browsers.
+Live at **https://etiszc.github.io/quenottes/** (was `/brosse-et-brille/` until the repo rename on 2026-10-21; the old URL no longer works, testers must re-add the app to their home screen — their data stays, localStorage is per origin) — open in **Safari** → Partager → « Sur l'écran d'accueil »; full-screen and offline after the first visit. Same link works on Android browsers.
 
-- **Deploy**: `.github/workflows/pages.yml` runs on every push to `main` (was `phase-8-pwa` until the merge on 2026-10-21) (npm ci → npm test → `PAGES_BASE=/brosse-et-brille/ npm run build` → deploy-pages). Pages source = GitHub Actions; the `github-pages` environment allows `main` and `phase-8-pwa`. Pushing a change to `.github/workflows/` needs the `workflow` scope: `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` (the keychain credential lacks it).
+- **Deploy**: `.github/workflows/pages.yml` runs on every push to `main` (was `phase-8-pwa` until the merge on 2026-10-21) (npm ci → npm test → `PAGES_BASE=/quenottes/ npm run build` → deploy-pages). Pages source = GitHub Actions; the `github-pages` environment allows `main` and `phase-8-pwa`. Pushing a change to `.github/workflows/` needs the `workflow` scope: `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` (the keychain credential lacks it).
 - **Base path**: `vite.config.ts` uses `PAGES_BASE` only for Pages; every other build (dev, **Android/Capacitor**) keeps `/`. Router `basename = import.meta.env.BASE_URL`; `404.html` copied only in the Pages build.
 - **Offline**: workbox precaches js/css/html, Lily's 13 mp3, the 7 woff2 fonts, images and icons (`maximumFileSizeToCacheInBytes` 3 MB). Verified offline on the live site (reload + voice clip from cache).
 - **iPhone specifics**: `navigator.audioSession.type = "playback"` in `unlockAudio()` (silent switch doesn't mute), `viewport-fit=cover` + safe-area padding in `BathroomBackground`, apple-touch-icon / PWA icons in `public/` (generated from `assets/logo.png`), `navigator.storage.persist()` at start.
@@ -105,7 +105,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 
 ## Known issues
 
-- Binary assets (mascots, favicon) can't be read through the Lovable API (they come back corrupted); fetch them from the GitHub mirror instead: `gh api -H "Accept: application/vnd.github.raw" repos/EtiSZC/quenottes/contents/<path>`.
+- Binary assets (mascots, favicon) can't be read through the Lovable API (they come back corrupted); fetch them from the GitHub mirror instead: `gh api -H "Accept: application/vnd.github.raw" repos/EtiSZC/quenottes-lovable/contents/<path>`.
 - Tests: recent Node shadows jsdom's `localStorage`; `src/test/setup.ts` installs an in-memory one.
 
 ## Product principles (keep)
@@ -159,5 +159,5 @@ npm run android    # rebuild + reinstall on the phone
 7b. ✅ **Sync fix: each child's stickers** (2026-10-14, branch `fix-sync-stickers`; two-phone test validated 2026-10-21, merged into `main`) — every install used the id `default` for its first profile, so the first child landed in the other phone's empty "Moi" and hand-made duplicates never got stickers. Unique ids, name-aware matching, name filling, collision guard, repair card. Guarantee: after syncing both ways, both phones have the same children and **one separate album per child** = the union of that child's stickers.
 8. ✅ **PWA for iPhone testers** (2026-10-12, live on GitHub Pages; Android regression validated, merged into `main` on 2026-10-21, Pages now deploys from `main`).
 9. ✅ **Halloween stickers** (2026-10-19, branch `phase-9-halloween` from `fix-sync-stickers`; validated on the Galaxy A55 on 2026-10-19; merged into `phase-8-pwa` → live on GitHub Pages) — every child had all 20 stickers; 15 Halloween stickers (🎃 👻 🦇 🧙 🧹 🐈‍⬛ 🦉 🌕 🔮 🕸️ 🧛 🪄 💀 🧟 🕷️ — skull, zombie and spider kept at the user's request), winnable only 15 Oct – 2 Nov (user's choice), kept forever. Sync field `h`. Merged into `main` on 2026-10-21.
-10. 🔄 **Rename to Quenottes + new background** (2026-10-21, branch `phase-10-quenottes` from `main` @ tag `v0.9-halloween`) — app name, Android package `com.etiszc.quenottes`, title on home and on the profile picker; « Bain moussant » background (no tile grid, mint gradient, iridescent soap bubbles that sway, wobble and pop). Then: GitHub repo rename, APK on the phone.
+10. ✅ **Rename to Quenottes + new background** (2026-10-21, branch `phase-10-quenottes` from `main` @ tag `v0.9-halloween`) — app name, Android package `com.etiszc.quenottes`, title on home and on the profile picker; « Bain moussant » background (no tile grid, mint gradient, iridescent soap bubbles that sway, wobble and pop). Merged into `main` on 2026-10-21; repo renamed `EtiSZC/quenottes`, web app at https://etiszc.github.io/quenottes/; v0.10 APK on the Galaxy A55.
 11. **Later** — Brillou poses (needs illustration), parent corner with history/tips, optional local reminders, signed release build for Google Play (+ paid ElevenLabs plan and regenerated clips for commercial use).
