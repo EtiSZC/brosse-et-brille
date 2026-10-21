@@ -22,7 +22,7 @@ export default {
         bubblegum: { DEFAULT: "hsl(var(--bubblegum))", shadow: "hsl(var(--bubblegum-shadow))" },
         sunshine: "hsl(var(--sunshine))",
         ink: "hsl(var(--ink))",
-        tile: { DEFAULT: "hsl(var(--tile))", line: "hsl(var(--tile-line))" },
+        tile: { DEFAULT: "hsl(var(--tile))" },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

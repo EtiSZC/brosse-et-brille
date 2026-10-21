@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import AppTitle from "@/components/AppTitle";
 import BathroomBackground from "@/components/BathroomBackground";
 import LongPressButton from "@/components/LongPressButton";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,10 @@ const ProfilePicker = ({ profiles, onPick, onParents }: ProfilePickerProps) => {
   return (
     <BathroomBackground>
       <div className="flex flex-col items-center justify-center flex-1 px-6 pt-10 pb-24 gap-6">
-        <h1 className="text-4xl sm:text-5xl font-display font-bold text-center sticker-title">
+        <p className="text-5xl sm:text-6xl font-display font-bold text-center sticker-title">
+          <AppTitle />
+        </p>
+        <h1 className="text-3xl sm:text-4xl font-display font-bold text-center sticker-title">
           {together ? "Qui brosse ensemble\u00A0?" : "Qui se brosse les dents\u00A0?"}
         </h1>
 

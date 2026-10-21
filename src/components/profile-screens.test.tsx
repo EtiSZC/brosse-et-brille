@@ -30,6 +30,15 @@ describe("profile screens", () => {
     expect(onPick).toHaveBeenLastCalledWith(["lea", "tom"]);
   });
 
+  it("picker and home both show the app name, Quenottes", () => {
+    const { unmount } = render(<ProfilePicker profiles={[LEA, TOM]} onPick={() => {}} onParents={() => {}} />);
+    expect(screen.getByText("Quenottes")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Qui se brosse les dents ?" })).toBeInTheDocument();
+    unmount();
+    render(<HomeScreen onStart={() => {}} onAlbum={() => {}} onSwitch={() => {}} onParents={() => {}} />);
+    expect(screen.getByRole("heading", { name: "Quenottes" })).toBeInTheDocument();
+  });
+
   it("parent gate: a short tap does nothing, holding 2 seconds opens it", () => {
     vi.useFakeTimers();
     const onParents = vi.fn();

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import mascotImg from "@/assets/mascot.png";
 import { Button } from "@/components/ui/button";
+import AppTitle from "@/components/AppTitle";
 import BathroomBackground from "@/components/BathroomBackground";
 import MuteButton from "@/components/MuteButton";
 import SpeechBubble from "@/components/SpeechBubble";
@@ -17,10 +18,6 @@ interface HomeScreenProps {
   onSwitch: () => void;
   onParents: () => void;
 }
-
-const TITLE = "Brosse & Brille";
-// Small fixed tilt per letter for a hand-stuck sticker look.
-const TILTS = [-3, 2, -2, 3, -1, 2, 0, -2, 0, 3, -2, 2, -3, 1, -2];
 
 const HomeScreen = ({ onStart, onAlbum, onSwitch, onParents }: HomeScreenProps) => {
   // Read once per visit to the home screen (the history only changes after a session).
@@ -109,18 +106,8 @@ const HomeScreen = ({ onStart, onAlbum, onSwitch, onParents }: HomeScreenProps) 
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25, duration: 0.5 }}
           className="relative text-5xl sm:text-6xl font-display font-bold text-center mb-3 sticker-title"
-          aria-label={TITLE}
         >
-          {TITLE.split("").map((char, i) => (
-            <span
-              key={i}
-              aria-hidden
-              className="inline-block"
-              style={{ transform: `rotate(${TILTS[i % TILTS.length]}deg)`, minWidth: char === " " ? "0.3em" : undefined }}
-            >
-              {char}
-            </span>
-          ))}
+          <AppTitle />
           {isHalloweenSeason() && (
             <span aria-hidden className="absolute -top-7 -right-3 text-4xl rotate-12">
               🎃

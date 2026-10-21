@@ -112,7 +112,7 @@ export interface DecodeResult {
   error: string;
 }
 
-const INVALID: DecodeResult = { ok: false, profiles: [], error: "Ce code ne vient pas de Brosse & Brille, ou il est abîmé." };
+const INVALID: DecodeResult = { ok: false, profiles: [], error: "Ce code ne vient pas de Quenottes, ou il est abîmé." };
 
 /** Strict reading of a scanned code: anything unexpected is refused. */
 export function decodeState(text: string): DecodeResult {
