@@ -1,4 +1,4 @@
-# Brosse & Brille
+# Quenottes (formerly Brosse & Brille)
 
 A playful PWA that guides children (ages 3–8) through a 3-minute tooth-brushing session with the mascot **Brillou**. UI language is **French**. Originally scaffolded in Lovable (project `5e07ab90-e764-4e9b-8721-6225fc74815b`, "Sparkle Brush Buddy"), mirrored to the private GitHub repo `EtiSZC/quenottes`; now developed locally.
 
@@ -19,7 +19,7 @@ Don't use Playwright's fake clock (`page.clock`) for visual checks: it desyncs f
 
 ## Android app (Capacitor)
 
-`android/` is a Capacitor 8 native project (app id `com.etiszc.brosseetbrille`, portrait only) that packages `dist/` into an APK. Toolchain on this Mac: Java 21 (`brew openjdk@21`, keg-only) and the Android SDK at `/opt/homebrew/share/android-commandlinetools` (platform 36, build-tools 36). Target phone: Samsung Galaxy A55 (Android 16), connected over USB with debugging on.
+`android/` is a Capacitor 8 native project (app id `com.etiszc.quenottes` since the rename — `com.etiszc.brosseetbrille` up to v0.9, a different app for Android, so its data must be copied over or re-synced by QR; portrait only) that packages `dist/` into an APK. Toolchain on this Mac: Java 21 (`brew openjdk@21`, keg-only) and the Android SDK at `/opt/homebrew/share/android-commandlinetools` (platform 36, build-tools 36). Target phone: Samsung Galaxy A55 (Android 16), connected over USB with debugging on.
 
 ```bash
 npm run android   # build web → cap sync → gradle assembleDebug → adb install → launch
@@ -71,7 +71,8 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 ## Architecture
 
 - `src/pages/Index.tsx` — state machine: `who` (picker, start screen when ≥ 2 profiles) → `home` → `brushing` → `celebration`, plus `album` and `parents`. On completion it calls `recordSessions()` (one entry per active child) and passes the results to the celebration.
-- `src/components/BathroomBackground.tsx` — shared "candy bathroom" scene (tiles, optional tint, rising bubbles, foam). Every screen renders inside it.
+- `src/components/BathroomBackground.tsx` — shared « Bain moussant » scene (soft mint gradient, no tile grid since phase 10; optional tint; 14 iridescent soap bubbles with fixed parameters that rise, sway, wobble and pop with a ring + droplets at their own height; foam). Every screen renders inside it.
+- `src/components/AppTitle.tsx` — `APP_NAME` ("Quenottes") as a sticker title with tilted letters, on the home screen and the profile picker. Internal names stay: localStorage keys `brosse-brille:*` and the `BB1` sync prefix (renaming them would lose data / break older phones).
 - `src/components/HomeScreen.tsx` — sticker title, Brillou + speech bubble, `WeekCalendar` + streak, 📒 album button (top right, sticker-count badge), breathing 72px start button (`size="xl"`).
 - `src/components/BrushingScreen.tsx` — timestamp-based timer (`Date.now()` deltas, survives pauses), zone via `getZoneAt()` and phase via `getPhaseAt()` (fractional seconds), pause overlay (✕ and ⏸ both open it; "Arrêter" there cancels), auto-pause on `visibilitychange`, Wake Lock. At 3:00 shows "Bravo, tout brille !" + sparkle wave for 1.8 s, then `onComplete` (once). Layout: small parent timer, `BubbleTimer`, `MouthDiagram` + `MiniMap`, Brillou + `SpeechBubble` with the phase instruction.
 - `src/components/mouth/geometry.ts` — pure, unit-tested logic: smile view (10 teeth per arch: 3 molars, 4 front, 3 molars; molars have cusps), top-down arch view (`ARCH_TEETH`), `targetIndices`, `spotlightWindow`, `zoomViewBox` (1.9× on molars for "side" phases), `brushPlan`/`brushPosition` (ping-pong path across every target tooth, molars back→front), `isSurfaceShiny` (matte → shiny when the brush's first pass reaches a tooth).
@@ -99,7 +100,7 @@ React 18 + TypeScript, Vite 5, Tailwind 3 + shadcn/ui (only `button`, `toast`, `
 - `src/data/brushingZones.ts` — 8 zones, each with `phases[]` (`view`: front / inside / side / top, duration, instruction). Molar zones = side 11 s + top 12 s. Hue family upper 200 / lower 25. Durations sum to 180 s. Instructions use a non-breaking space before "!".
 - `src/lib/sounds.ts` — WebAudio synthesized sounds on one shared `AudioContext`; `unlockAudio()` must be called inside a user tap (iOS); mute persisted in localStorage.
 - `src/hooks/use-wake-lock.ts` — Screen Wake Lock, re-requested when the page becomes visible.
-- `src/index.css` — palette tokens (mint, bubblegum, sunshine, ink, tile), also exposed as Tailwind colours; `.bathroom-tiles`, `.bubble`, `.sticker-title`, squash-and-stretch `.mascot-bounce`, `.breathe`.
+- `src/index.css` — palette tokens (mint, bubblegum, sunshine, ink, tile), also exposed as Tailwind colours; `.bubble-bath`, `.bubble` (+ `.bubble-sway/-pop/-wobble/-film/-rim/-shine`), `.sticker-title`, squash-and-stretch `.mascot-bounce`, `.breathe`.
 
 ## Known issues
 
